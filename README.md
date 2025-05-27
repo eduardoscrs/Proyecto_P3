@@ -59,28 +59,29 @@ Este proyecto simula un sistema de entrega autónoma con drones para la empresa 
 
 ## 🗂️ Estructura del Proyecto
 
-└── Proyect
-    ├── domain
-    │   ├── client.py
-    │   ├── order.py
-    │   └── route.py
-    ├── model
-    │   ├── __init__.py
-    │   ├── edge.py
-    │   ├── graph.py
-    │   └── vertex.py
-    ├── sim
-    │   ├── init_simulation.py
-    │   └── simulation.py
-    ├── tda
-    │   ├── avl.py
-    │   └── hasp_map.py
-    └── visual
-        ├── avl_visualizer.py
-        ├── dashboard.py
-        └── networkx_adapter.py
-
----
+```
+Proyecto_P3/
+├── domain/
+│   ├── client.py
+│   ├── order.py
+│   └── route.py
+├── model/
+│   ├── __init__.py
+│   ├── edge.py
+│   ├── graph.py
+│   └── vertex.py
+├── sim/
+│   ├── init_simulation.py
+│   └── simulation.py
+├── tda/
+│   ├── avl.py
+│   └── hash_map.py
+├── visual/
+│   ├── avl_visualizer.py
+│   ├── dashboard.py
+│   └── networkx_adapter.py
+└── README.md
+```
 
 ## ✅ Estado del Proyecto
 
