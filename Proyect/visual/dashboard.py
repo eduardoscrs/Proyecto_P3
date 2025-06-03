@@ -9,7 +9,7 @@ import random
 
 st.set_page_config(layout="wide")
 
-# Estado de la sesión para almacenar el grafo y datos
+# Estado de la sesión para almacenar el grafo y datos 
 if "graph" not in st.session_state:
     st.session_state.graph = None
 if "orders" not in st.session_state:
