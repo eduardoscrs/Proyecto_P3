@@ -1,10 +1,18 @@
 class Node:
+<<<<<<< HEAD
     def __init__(self, key, value=1):  # key es una tupla (ruta), value es la frecuencia
         self.key = key
         self.value = value
         self.left = None
         self.right = None
         self.height = 0
+=======
+    def __init__(self, key):
+        self.key = key
+        self.left = None
+        self.right = None
+        self.height = 0  # nodo singular tiene altura 0
+>>>>>>> nelson
 
 def height(N):
     return -1 if N is None else N.height
@@ -15,15 +23,28 @@ def get_balance(N):
 def right_rotate(y):
     x = y.left
     T2 = x.right
+<<<<<<< HEAD
     x.right = y
     y.left = T2
     y.height = max(height(y.left), height(y.right)) + 1
     x.height = max(height(x.left), height(x.right)) + 1
+=======
+
+    # Rotación
+    x.right = y
+    y.left = T2
+
+    # Actualizar alturas
+    y.height = max(height(y.left), height(y.right)) + 1
+    x.height = max(height(x.left), height(x.right)) + 1
+
+>>>>>>> nelson
     return x
 
 def left_rotate(x):
     y = x.right
     T2 = y.left
+<<<<<<< HEAD
     y.left = x
     x.right = T2
     x.height = max(height(x.left), height(x.right)) + 1
@@ -42,6 +63,34 @@ def insert(node, key, value=1):
         return node
     node.height = max(height(node.left), height(node.right)) + 1
     balance = get_balance(node)
+=======
+
+    # Rotación
+    y.left = x
+    x.right = T2
+
+    # Actualizar alturas
+    x.height = max(height(x.left), height(x.right)) + 1
+    y.height = max(height(y.left), height(y.right)) + 1
+
+    return y
+
+def insert(node, key):
+    if node is None:
+        return Node(key)
+
+    if key < node.key:
+        node.left = insert(node.left, key)
+    elif key > node.key:
+        node.right = insert(node.right, key)
+    else:
+        return node  # no se permiten duplicados
+
+    node.height = max(height(node.left), height(node.right)) + 1
+    balance = get_balance(node)
+
+    # Casos de desbalanceo
+>>>>>>> nelson
     if balance > 1 and key < node.left.key:
         return right_rotate(node)
     if balance < -1 and key > node.right.key:
@@ -52,6 +101,10 @@ def insert(node, key, value=1):
     if balance < -1 and key < node.right.key:
         node.right = right_rotate(node.right)
         return left_rotate(node)
+<<<<<<< HEAD
+=======
+
+>>>>>>> nelson
     return node
 
 def min_value_node(node):
@@ -63,6 +116,10 @@ def min_value_node(node):
 def delete_node(root, key):
     if root is None:
         return root
+<<<<<<< HEAD
+=======
+
+>>>>>>> nelson
     if key < root.key:
         root.left = delete_node(root.left, key)
     elif key > root.key:
@@ -73,12 +130,23 @@ def delete_node(root, key):
         else:
             temp = min_value_node(root.right)
             root.key = temp.key
+<<<<<<< HEAD
             root.value = temp.value
             root.right = delete_node(root.right, temp.key)
     if root is None:
         return root
     root.height = max(height(root.left), height(root.right)) + 1
     balance = get_balance(root)
+=======
+            root.right = delete_node(root.right, temp.key)
+
+    if root is None:
+        return root
+
+    root.height = max(height(root.left), height(root.right)) + 1
+    balance = get_balance(root)
+
+>>>>>>> nelson
     if balance > 1 and get_balance(root.left) >= 0:
         return right_rotate(root)
     if balance > 1 and get_balance(root.left) < 0:
@@ -89,10 +157,15 @@ def delete_node(root, key):
     if balance < -1 and get_balance(root.right) > 0:
         root.right = right_rotate(root.right)
         return left_rotate(root)
+<<<<<<< HEAD
+=======
+
+>>>>>>> nelson
     return root
 
 def pre_order(root):
     if root:
+<<<<<<< HEAD
         print(f"{root.key}: Freq {root.value}", end="; ")
         pre_order(root.left)
         pre_order(root.right)
@@ -111,3 +184,21 @@ def to_networkx(root, G=None):
             G.add_edge(str(root.key), str(root.right.key))
             to_networkx(root.right, G)
     return G
+=======
+        print(f"{root.key} ", end="")
+        pre_order(root.left)
+        pre_order(root.right)
+
+# Prueba
+if __name__ == "__main__":
+    root = None
+    for key in [9, 5, 10, 0, 6, 11, -1, 1, 2]:
+        root = insert(root, key)
+
+    print("Preorden del AVL construido:")
+    pre_order(root)
+
+    root = delete_node(root, 10)
+    print("\nPreorden luego de eliminar 10:")
+    pre_order(root)
+>>>>>>> nelson
