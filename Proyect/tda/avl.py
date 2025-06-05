@@ -64,7 +64,6 @@ def insert(node, key):
     if balance < -1 and key < node.right.key:
         node.right = right_rotate(node.right)
         return left_rotate(node)
-
     return node
 
 def min_value_node(node):
@@ -76,7 +75,6 @@ def min_value_node(node):
 def delete_node(root, key):
     if root is None:
         return root
-
     if key < root.key:
         root.left = delete_node(root.left, key)
     elif key > root.key:
@@ -105,7 +103,6 @@ def delete_node(root, key):
     if balance < -1 and get_balance(root.right) > 0:
         root.right = right_rotate(root.right)
         return left_rotate(root)
-
     return root
 
 def pre_order(root):
