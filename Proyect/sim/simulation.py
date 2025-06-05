@@ -2,7 +2,7 @@ from Proyect.model.graph import Graph
 from Proyect.tda.hash_map import Map
 from Proyect.tda import avl
 
-def run_simulation():
+def run_simulation(origin, destination, priority):
     graph = Graph(directed=True)
 
     # Insertar nodos
@@ -18,7 +18,7 @@ def run_simulation():
     graph.insert_edge(c, d, 25)
     graph.insert_edge(b, d, 40)
 
-    # Pedidos en AVL
+    # AVL de pedidos (simulado)
     pedido_avl_root = None
     for pedido_id in [105, 103, 110]:
         pedido_avl_root = avl.insert(pedido_avl_root, pedido_id)
@@ -28,31 +28,23 @@ def run_simulation():
     clientes.put("B", {"nombre": "Cliente B", "pedidos": [105]})
     clientes.put("D", {"nombre": "Cliente D", "pedidos": [103, 110]})
 
-    # Resultados de rutas
-    resultados = []
+    # Obtener vértices de origen y destino
+    v_origen = next((v for v in graph.vertices() if v.element() == origin), None)
+    v_destino = next((v for v in graph.vertices() if v.element() == destination), None)
 
-    for cliente_id in ["B", "D"]:
-        cliente_vertex = None
-        for v in graph.vertices():
-            if v.element() == cliente_id:
-                cliente_vertex = v
-                break
+    if not v_origen or not v_destino:
+        return {"error": "Origen o destino no válido"}
 
-        if cliente_vertex:
-            path, cost = graph.find_path_with_battery(a, cliente_vertex, max_battery=50)
-            if path:
-                resultados.append({
-                    "cliente": cliente_id,
-                    "ruta": [v.element() for v in path],
-                    "costo": cost,
-                    "pedidos": clientes.get(cliente_id)["pedidos"]
-                })
-            else:
-                resultados.append({
-                    "cliente": cliente_id,
-                    "ruta": None,
-                    "costo": None,
-                    "pedidos": clientes.get(cliente_id)["pedidos"]
-                })
+    # Buscar ruta
+    path, cost = graph.find_path_with_battery(v_origen, v_destino, max_battery=50)
 
-    return resultados
+    resultado = {
+        "origen": origin,
+        "destino": destination,
+        "prioridad": priority,
+        "ruta": [v.element() for v in path] if path else None,
+        "costo": cost if path else None,
+        "pedidos": clientes.get(destination)["pedidos"] if clientes.get(destination) else []
+    }
+
+    return resultado
