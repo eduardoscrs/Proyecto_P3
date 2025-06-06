@@ -1,6 +1,8 @@
 from Proyect.model.graph import Graph
 from Proyect.tda.hash_map import Map
 from Proyect.tda import avl
+from Proyect.model.graph_utils import bfs
+
 
 def run_simulation(origin, destination, priority):
     graph = Graph(directed=True)
