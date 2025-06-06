@@ -51,3 +51,12 @@ class Map:
 
     def __len__(self):
         return self._size
+
+    def items(self):
+        """Devuelve todos los pares clave-valor almacenados en el hash map."""
+        result = []
+        for bucket in self._table:
+            if bucket:
+                for k, v in bucket:
+                    result.append((k, v))
+        return result

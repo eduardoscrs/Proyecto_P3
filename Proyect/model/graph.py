@@ -89,3 +89,10 @@ class Graph:
                     new_path = path + [neighbor]
                     queue.append((neighbor, new_path, new_cost))
         return None, 0  # No se encontró ruta válida
+    
+    def get_vertex(self, name):
+        """Devuelve el vértice cuyo elemento sea igual a `name`."""
+        for v in self.vertices():
+            if v.element() == name:
+                return v
+        return None

@@ -1,52 +1,92 @@
+import networkx as nx
+import random
 from Proyect.model.graph import Graph
 from Proyect.tda.hash_map import Map
 from Proyect.tda import avl
 from Proyect.model.graph_utils import bfs
 
-
-def run_simulation(origin, destination, priority):
+def run_simulation_dynamic(num_nodes, num_edges, num_orders):
+    nx_graph = nx.DiGraph()
     graph = Graph(directed=True)
 
+    # Asignar roles: 20% almacenamiento, 20% recarga, 60% cliente
+    num_storage = int(num_nodes * 0.2)
+    num_recharge = int(num_nodes * 0.2)
+    num_client = num_nodes - num_storage - num_recharge
+
+    def generate_node_names(n):
+        from string import ascii_uppercase
+        names = []
+        i = 0
+        while len(names) < n:
+            if i < 26:
+                names.append(ascii_uppercase[i])
+            else:
+                names.append(ascii_uppercase[i // 26 - 1] + ascii_uppercase[i % 26])
+            i += 1
+        return names
+
+    node_names = generate_node_names(num_nodes)
+    random.shuffle(node_names)
+
+    storage_nodes = node_names[:num_storage]
+    recharge_nodes = node_names[num_storage:num_storage+num_recharge]
+    client_nodes = node_names[num_storage+num_recharge:]
+
     # Insertar nodos
-    a = graph.insert_vertex("A", node_type="almacenamiento")
-    b = graph.insert_vertex("B", node_type="cliente")
-    c = graph.insert_vertex("C", node_type="recarga")
-    d = graph.insert_vertex("D", node_type="cliente")
+    for name in storage_nodes:
+        graph.insert_vertex(name, node_type="almacenamiento")
+        nx_graph.add_node(name, tipo="almacenamiento")
+    for name in recharge_nodes:
+        graph.insert_vertex(name, node_type="recarga")
+        nx_graph.add_node(name, tipo="recarga")
+    for name in client_nodes:
+        graph.insert_vertex(name, node_type="cliente")
+        nx_graph.add_node(name, tipo="cliente")
 
-    # Insertar aristas
-    graph.insert_edge(a, b, 30)
-    graph.insert_edge(b, c, 10)
-    graph.insert_edge(a, c, 20)
-    graph.insert_edge(c, d, 25)
-    graph.insert_edge(b, d, 40)
+    # Insertar aristas aleatorias
+    added_edges = set()
+    while len(added_edges) < num_edges:
+        u, v = random.sample(node_names, 2)
+        if (u, v) not in added_edges and u != v:
+            weight = random.randint(5, 30)
+            u_vertex = graph.get_vertex(u)
+            v_vertex = graph.get_vertex(v)
+            graph.insert_edge(u_vertex, v_vertex, weight)
+            nx_graph.add_edge(u, v, weight=weight)
+            added_edges.add((u, v))
 
-    # AVL de pedidos (simulado)
+    # Generar pedidos
     pedido_avl_root = None
-    for pedido_id in [105, 103, 110]:
-        pedido_avl_root = avl.insert(pedido_avl_root, pedido_id)
+    order_list = []
+    for i in range(num_orders):
+        origin = random.choice(storage_nodes)
+        destination = random.choice(client_nodes)
+        priority = random.randint(1, 3)
+        order_id = 100 + i
+        pedido_avl_root = avl.insert(pedido_avl_root, order_id)
+        order_list.append({
+            "id": order_id,
+            "origin": origin,
+            "destination": destination,
+            "priority": priority
+        })
 
-    # Clientes en Hash Map
+    # Guardar clientes en HashMap
     clientes = Map()
-    clientes.put("B", {"nombre": "Cliente B", "pedidos": [105]})
-    clientes.put("D", {"nombre": "Cliente D", "pedidos": [103, 110]})
+    for name in client_nodes:
+        clientes.put(name, {
+            "nombre": f"Cliente {name}",
+            "pedidos": [o["id"] for o in order_list if o["destination"] == name]
+        })
 
-    # Obtener vértices de origen y destino
-    v_origen = next((v for v in graph.vertices() if v.element() == origin), None)
-    v_destino = next((v for v in graph.vertices() if v.element() == destination), None)
-
-    if not v_origen or not v_destino:
-        return {"error": "Origen o destino no válido"}
-
-    # Buscar ruta
-    path, cost = graph.find_path_with_battery(v_origen, v_destino, max_battery=50)
-
-    resultado = {
-        "origen": origin,
-        "destino": destination,
-        "prioridad": priority,
-        "ruta": [v.element() for v in path] if path else None,
-        "costo": cost if path else None,
-        "pedidos": clientes.get(destination)["pedidos"] if clientes.get(destination) else []
+    return {
+        "nx_graph": nx_graph,
+        "graph": graph,
+        "orders": order_list,
+        "storage_nodes": storage_nodes,
+        "client_nodes": client_nodes,
+        "recharge_nodes": recharge_nodes,
+        "clientes": clientes,
+        "pedido_avl_root": pedido_avl_root
     }
-
-    return resultado
