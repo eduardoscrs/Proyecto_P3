@@ -117,18 +117,43 @@ def main():
     with tabs[2]:
         st.header("📋 Información de Clientes y Órdenes")
         if "last_simulation" in st.session_state:
-            col1, col2 = st.columns(2)
 
-            with col1:
-                st.subheader("👤 Clientes")
-                clientes = st.session_state["last_simulation"]["clientes"]
-                data = [{"Cliente": k, "Pedidos": v["pedidos"]} for k, v in clientes.items()]
-                st.dataframe(data, use_container_width=True)
+            # Clientes
+            st.subheader("👤 Clientes")
+            clientes = st.session_state["last_simulation"]["clientes"]
+            clientes_lista = []
+            for cliente_id, datos in clientes.items():
+                cliente_info = {
+                    "ID": cliente_id,
+                    "nombre": datos.get("nombre", "Desconocido"),
+                    "tipo": datos.get("tipo", "N/A"),
+                    "total de pedidos": len(datos.get("pedidos", []))
+                }
+                clientes_lista.append(cliente_info)
+            
+            # Mostrar cada cliente como un bloque JSON separado
+            for cliente in clientes_lista:
+                st.json(cliente, expanded=True)
 
-            with col2:
-                st.subheader("📦 Órdenes")
-                orders = st.session_state["last_simulation"]["orders"]
-                st.dataframe(orders, use_container_width=True)
+            # Ordenes
+            st.subheader("📦 Órdenes")
+            orders = st.session_state["last_simulation"]["orders"]
+
+            for order in orders:
+                order_info = {
+                    "ID": order.get("id", "N/A"),
+                    "cliente asociado": order.get("cliente_nombre", "Desconocido"),  # Ajusta si no está en datos
+                    "cliente ID": order.get("cliente_id", "N/A"),
+                    "origen": order.get("origen", "N/A"),
+                    "destino": order.get("destino", "N/A"),
+                    "estado": order.get("status", "N/A"),
+                    "prioridad": order.get("prioridad", "N/A"),
+                    "fecha de creación": order.get("fecha_creacion", "N/A"),
+                    "fecha de entrega": order.get("fecha_entrega", "N/A"),
+                    "costo total": order.get("costo_total", "N/A")
+                }
+                st.json(order_info, expanded=True)
+
         else:
             st.warning("⚠️ Debes ejecutar una simulación primero.")
 
