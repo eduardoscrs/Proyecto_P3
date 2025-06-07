@@ -53,7 +53,7 @@ def main():
 
     st.markdown("Bienvenido al sistema de simulación logística de Correos Chile.")
 
-    tabs = st.tabs(["🔁 Simulación", "🗺️ Visualización", "👤 Clientes", "📦 Órdenes", "📊 Estadísticas"])
+    tabs = st.tabs(["🔁 Simulación", "🗺️ Visualización", "📋 Clientes y órdenes", "📊 Estadísticas"])
 
 # 1. Simulación
     with tabs[0]:
@@ -113,24 +113,27 @@ def main():
                         st.error("❌ No existe una ruta entre esos nodos.")
                 draw_network(nx_graph, path)
 
-    # 3. Clientes
+    # 3. Clientes y Órdenes
     with tabs[2]:
-        st.header("👤 Gestión de Clientes")
-        st.info("Información relacionada a los clientes y su historial de pedidos.")
+        st.header("📋 Información de Clientes y Órdenes")
         if "last_simulation" in st.session_state:
-            clientes = st.session_state["last_simulation"]["clientes"]
-            data = [{"Cliente": k, "Pedidos": v["pedidos"]} for k, v in clientes.items()]
-            st.dataframe(data)
+            col1, col2 = st.columns(2)
 
-    # 4. Órdenes
-    with tabs[3]:
-        st.header("📦 Órdenes y Estados")
-        if "last_simulation" in st.session_state:
-            orders = st.session_state["last_simulation"]["orders"]
-            st.dataframe(orders)
+            with col1:
+                st.subheader("👤 Clientes")
+                clientes = st.session_state["last_simulation"]["clientes"]
+                data = [{"Cliente": k, "Pedidos": v["pedidos"]} for k, v in clientes.items()]
+                st.dataframe(data, use_container_width=True)
+
+            with col2:
+                st.subheader("📦 Órdenes")
+                orders = st.session_state["last_simulation"]["orders"]
+                st.dataframe(orders, use_container_width=True)
+        else:
+            st.warning("⚠️ Debes ejecutar una simulación primero.")
 
     # 5. Estadísticas
-    with tabs[4]:
+    with tabs[3]:
         st.header("📊 Estadísticas del Sistema")
         st.info("Frecuencia de uso de nodos, rutas frecuentes, y análisis de entregas.")
         st.markdown("📈 En desarrollo...")
