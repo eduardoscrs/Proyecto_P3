@@ -2,47 +2,58 @@ import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
 from Proyect.sim.simulation import run_simulation_dynamic
-
 def draw_network(nx_graph, path=None):
     import matplotlib.pyplot as plt
     import networkx as nx
+    from matplotlib.patches import Patch
 
     tipo_color = {
-        "almacenamiento": "#f39c12",
-        "recarga": "#3498db",
-        "cliente": "#2ecc71"
+        "almacenamiento": "#f39c12",  # naranja
+        "recarga": "#3498db",         # azul
+        "cliente": "#2ecc71"          # verde
     }
 
     num_nodes = nx_graph.number_of_nodes()
 
     # Layout adaptativo
-    if num_nodes <= 30:
-        pos = nx.spring_layout(nx_graph, seed=42)
-    elif num_nodes <= 100:
-        pos = nx.kamada_kawai_layout(nx_graph)
-    else:
-        pos = nx.shell_layout(nx_graph)  # Más ordenado en nodos grandes
+    try:
+        if num_nodes <= 30:
+            pos = nx.spring_layout(nx_graph, seed=42)
+        elif num_nodes <= 100:
+            pos = nx.kamada_kawai_layout(nx_graph)
+        else:
+            pos = nx.shell_layout(nx_graph)
+    except:
+        pos = nx.spring_layout(nx_graph, seed=42)  # Fallback si falta scipy
 
     node_colors = [tipo_color.get(nx_graph.nodes[n].get("tipo", ""), "#95a5a6") for n in nx_graph.nodes]
     edge_colors = ["red" if path and (u, v) in zip(path, path[1:]) else "gray" for u, v in nx_graph.edges]
 
-    # Tamaño dinámico
+    # Tamaño adaptativo
     node_size = 800 if num_nodes <= 30 else 400 if num_nodes <= 100 else 200
     font_size = 10 if num_nodes <= 30 else 8 if num_nodes <= 100 else 6
 
-    plt.figure(figsize=(12, 8 if num_nodes <= 100 else 10))
+    plt.figure(figsize=(12, 9))
     nx.draw(nx_graph, pos, with_labels=True,
             node_color=node_colors,
             edge_color=edge_colors,
             node_size=node_size,
-            width=1.8,
+            width=2.5,
             font_size=font_size,
             font_weight='bold')
 
-    # Etiquetas de peso solo para grafos pequeños
+    # Mostrar etiquetas de aristas solo si hay pocos nodos
     if num_nodes <= 50:
         edge_labels = nx.get_edge_attributes(nx_graph, 'weight')
         nx.draw_networkx_edge_labels(nx_graph, pos, edge_labels=edge_labels, font_size=font_size)
+
+    # Añadir leyenda
+    legend_elements = [
+        Patch(facecolor=tipo_color["almacenamiento"], label="Storage"),
+        Patch(facecolor=tipo_color["recarga"], label="Recharge"),
+        Patch(facecolor=tipo_color["cliente"], label="Client"),
+    ]
+    plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
 
     st.pyplot(plt.gcf())
 
