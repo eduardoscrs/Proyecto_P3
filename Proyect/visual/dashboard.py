@@ -2,6 +2,8 @@ import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
 from Proyect.sim.simulation import run_simulation_dynamic
+
+
 def draw_network(nx_graph, path=None):
     import matplotlib.pyplot as plt
     import networkx as nx
@@ -49,9 +51,9 @@ def draw_network(nx_graph, path=None):
 
     # Añadir leyenda
     legend_elements = [
-        Patch(facecolor=tipo_color["almacenamiento"], label="Storage"),
-        Patch(facecolor=tipo_color["recarga"], label="Recharge"),
-        Patch(facecolor=tipo_color["cliente"], label="Client"),
+        Patch(facecolor=tipo_color["almacenamiento"], label="Almacenamiento"),
+        Patch(facecolor=tipo_color["recarga"], label="Recarga"),
+        Patch(facecolor=tipo_color["cliente"], label="Cliente"),
     ]
     plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
 
