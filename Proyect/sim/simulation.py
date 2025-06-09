@@ -4,6 +4,9 @@ from Proyect.model.graph import Graph
 from Proyect.tda.hash_map import Map
 from Proyect.tda import avl
 from Proyect.model.graph_utils import bfs
+from Proyect.domain.client import Client
+from Proyect.domain.order import Order
+
 
 def run_simulation_dynamic(num_nodes, num_edges, num_orders):
     nx_graph = nx.DiGraph()
@@ -44,8 +47,28 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
         graph.insert_vertex(name, node_type="cliente")
         nx_graph.add_node(name, tipo="cliente")
 
-    # Insertar aristas aleatorias
+# Conectar todos los nodos asegurando que el grafo sea conexo
     added_edges = set()
+    connected = set()
+    available = list(node_names)
+    random.shuffle(available)
+
+    # Conectar como un árbol (n - 1 aristas)
+    first = available.pop()
+    connected.add(first)
+
+    while available:
+        u = random.choice(list(connected))
+        v = available.pop()
+        weight = random.randint(5, 30)
+        u_vertex = graph.get_vertex(u)
+        v_vertex = graph.get_vertex(v)
+        graph.insert_edge(u_vertex, v_vertex, weight)
+        nx_graph.add_edge(u, v, weight=weight)
+        added_edges.add((u, v))
+        connected.add(v)
+
+    # Añadir aristas adicionales si es necesario
     while len(added_edges) < num_edges:
         u, v = random.sample(node_names, 2)
         if (u, v) not in added_edges and u != v:
@@ -56,34 +79,42 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
             nx_graph.add_edge(u, v, weight=weight)
             added_edges.add((u, v))
 
-    # Generar pedidos
+    # Generar pedidos (Order)
     pedido_avl_root = None
-    order_list = []
+    orders = []
     for i in range(num_orders):
         origin = random.choice(storage_nodes)
         destination = random.choice(client_nodes)
         priority = random.randint(1, 3)
-        order_id = 100 + i
-        pedido_avl_root = avl.insert(pedido_avl_root, order_id)
-        order_list.append({
-            "id": order_id,
-            "origin": origin,
-            "destination": destination,
-            "priority": priority
-        })
+        order_id = f"{100+i}"
+        client_id = destination
+        client_name = f"Client{client_id}"
 
-    # Guardar clientes en HashMap
+        order = Order(
+            order_id=order_id,
+            client=client_name,
+            client_id=client_id,
+            origin=origin,
+            destination=destination,
+            priority=priority
+        )
+
+        pedido_avl_root = avl.insert(pedido_avl_root, int(order_id))
+        orders.append(order)
+
+    # Guardar clientes como objetos
     clientes = Map()
     for name in client_nodes:
-        clientes.put(name, {
-            "nombre": f"Cliente {name}",
-            "pedidos": [o["id"] for o in order_list if o["destination"] == name]
-        })
+        client = Client(client_id=name, name=f"Client{name}")
+        for order in orders:
+            if order.client_id == name:
+                client.add_order()
+        clientes.put(name, client)
 
     return {
         "nx_graph": nx_graph,
         "graph": graph,
-        "orders": order_list,
+        "orders": orders,
         "storage_nodes": storage_nodes,
         "client_nodes": client_nodes,
         "recharge_nodes": recharge_nodes,

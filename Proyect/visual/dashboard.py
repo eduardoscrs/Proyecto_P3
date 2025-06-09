@@ -1,23 +1,31 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from Proyect.sim.simulation import run_simulation_dynamic
 
+# ---------- UTILS ----------
+def plot_node_distribution(num_storage, num_recharge, num_clientes):
+    labels = ['Storage', 'Recharge', 'Client']
+    values = [num_storage, num_recharge, num_clientes]
+    colors = ['#f39c12', '#3498db', '#2ecc71']
+
+    fig, ax = plt.subplots()
+    ax.pie(values, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')
+    ax.set_title("Node Role Distribution")
+
+    return fig
 
 def draw_network(nx_graph, path=None):
-    import matplotlib.pyplot as plt
-    import networkx as nx
-    from matplotlib.patches import Patch
-
     tipo_color = {
-        "almacenamiento": "#f39c12",  # naranja
-        "recarga": "#3498db",         # azul
-        "cliente": "#2ecc71"          # verde
+        "almacenamiento": "#f39c12",
+        "recarga": "#3498db",
+        "cliente": "#2ecc71"
     }
 
     num_nodes = nx_graph.number_of_nodes()
 
-    # Layout adaptativo
     try:
         if num_nodes <= 30:
             pos = nx.spring_layout(nx_graph, seed=42)
@@ -26,12 +34,10 @@ def draw_network(nx_graph, path=None):
         else:
             pos = nx.shell_layout(nx_graph)
     except:
-        pos = nx.spring_layout(nx_graph, seed=42)  # Fallback si falta scipy
+        pos = nx.spring_layout(nx_graph, seed=42)
 
     node_colors = [tipo_color.get(nx_graph.nodes[n].get("tipo", ""), "#95a5a6") for n in nx_graph.nodes]
     edge_colors = ["red" if path and (u, v) in zip(path, path[1:]) else "gray" for u, v in nx_graph.edges]
-
-    # Tamaño adaptativo
     node_size = 800 if num_nodes <= 30 else 400 if num_nodes <= 100 else 200
     font_size = 10 if num_nodes <= 30 else 8 if num_nodes <= 100 else 6
 
@@ -44,109 +50,146 @@ def draw_network(nx_graph, path=None):
             font_size=font_size,
             font_weight='bold')
 
-    # Mostrar etiquetas de aristas solo si hay pocos nodos
     if num_nodes <= 50:
         edge_labels = nx.get_edge_attributes(nx_graph, 'weight')
         nx.draw_networkx_edge_labels(nx_graph, pos, edge_labels=edge_labels, font_size=font_size)
 
-    # Añadir leyenda
     legend_elements = [
-        Patch(facecolor=tipo_color["almacenamiento"], label="Almacenamiento"),
-        Patch(facecolor=tipo_color["recarga"], label="Recarga"),
-        Patch(facecolor=tipo_color["cliente"], label="Cliente"),
+        Patch(facecolor=tipo_color["almacenamiento"], label="Storage"),
+        Patch(facecolor=tipo_color["recarga"], label="Recharge"),
+        Patch(facecolor=tipo_color["cliente"], label="Client"),
     ]
     plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
 
     st.pyplot(plt.gcf())
 
-
+# ---------- MAIN APP ----------
 def main():
-    st.set_page_config(page_title="Simulación de Rutas", layout="wide")
-    st.title("📦 Simulador de Rutas de Entrega")
+    st.set_page_config(page_title="Drone Logistics Simulator", layout="wide")
+    st.title("🚁 Drone Logistics Simulator - Correos Chile")
 
-    st.markdown("Bienvenido al sistema de simulación logística de Correos Chile.")
+    tabs = st.tabs([
+        "🔁 Run Simulation",
+        "🌍 Explore Network",
+        "🌐 Clients & Orders",
+        "📋 Route Analytics",
+        "📈 Statistics"
+    ])
 
-    tabs = st.tabs(["🔁 Simulación", "🗺️ Visualización", "👤 Clientes", "📦 Órdenes", "📊 Estadísticas"])
-
-# 1. Simulación
+    # 1. Run Simulation
     with tabs[0]:
-        st.markdown("### Proporciones de roles de nodo (calculadas dinámicamente):")
-        
-        col1, col2 = st.columns([0.7, 0.3])
+        st.subheader("Initialize Simulation")
+        num_nodos = st.slider("Number of Nodes", 10, 150, 15)
+        num_aristas = st.slider("Number of Edges", 10, 300, 20)
+        num_ordenes = st.slider("Number of Orders", 1, 500, 10)
 
-        with col1:
-            num_nodos = st.slider("🔢 Número de nodos", 10, 150, 15)
-            num_aristas = st.slider("🔗 Número de aristas", 10, 300, 20)
-            num_ordenes = st.slider("📦 Número de órdenes", 1, 500, 10)
+        num_storage = int(num_nodos * 0.2)
+        num_recharge = int(num_nodos * 0.2)
+        num_clientes = num_nodos - num_storage - num_recharge
 
-            # Cálculo dinámico de proporciones
-            num_storage = int(num_nodos * 0.2)
-            num_recharge = int(num_nodos * 0.2)
-            num_clientes = num_nodos - num_storage - num_recharge
+        st.markdown(f"""
+        **Node Role Proportions:**
+        - 📦 Storage Nodes: {num_storage} (20%)
+        - 🔋 Recharge Nodes: {num_recharge} (20%)
+        - 👤 Client Nodes: {num_clientes} (60%)
+        """)
 
-            st.markdown(f"""
-            **🧮 Distribución estimada:**
-            - 🟫 Almacenamiento: {num_storage} ({round((num_storage/num_nodos)*100)}%)
-            - 🟦 Recarga: {num_recharge} ({round((num_recharge/num_nodos)*100)}%)
-            - 🟩 Cliente: {num_clientes} ({round((num_clientes/num_nodos)*100)}%)
-            """)
+        if st.button("🟢 Start Simulation"):
+            result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
+            st.session_state["last_simulation"] = result
+            st.session_state["completed_deliveries"] = []
+            st.success("Simulation completed!")
 
-        with col2:
-            st.subheader(" ")
-            if st.button("🟢 Iniciar simulación"):
-                result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
-                st.session_state["last_simulation"] = result
-                st.success("✅ Simulación completada")
-
-    # 2. Visualización
+    # 2. Explore Network
     with tabs[1]:
-        st.header("🗺️ Visualización de Red de Entregas")
+        st.header("🌍 Network Visualization")
         if "last_simulation" not in st.session_state:
-            st.warning("⚠️ Debes ejecutar una simulación primero.")
+            st.warning("Initialize a simulation first.")
         else:
             nx_graph = st.session_state["last_simulation"]["nx_graph"]
             node_options = list(nx_graph.nodes)
+            col1, col2 = st.columns([0.35, 0.65])
+            with col1:
+                st.subheader("📌 Calculate Route")
+                origen = st.selectbox("Origin Node", node_options)
+                destino = st.selectbox("Destination Node", node_options, index=1)
+                calcular = st.button("🚀 Calculate Route")
 
-            col_mapa, col_controles = st.columns([0.65, 0.35])
-            with col_controles:
-                st.subheader("📍 Calcular Ruta")
-                origen = st.selectbox("🟢 Nodo de Origen", node_options)
-                destino = st.selectbox("🔴 Nodo de Destino", node_options, index=1)
-                calcular = st.button("🚀 Calcular Ruta")
-
-            with col_mapa:
-                st.subheader("🌐 Grafo de la Red de Entrega")
+            with col2:
+                st.subheader("🌐 Graph View")
                 path = None
                 if origen != destino and calcular:
                     try:
                         path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
                         cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
-                        st.success(f"Ruta: {' ➡️ '.join(path)} (Costo total: {cost})")
+                        st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
+
+                        if st.button("✅ Completar Entrega"):
+                            orders = st.session_state["last_simulation"]["orders"]
+                            clientes = st.session_state["last_simulation"]["clientes"]
+
+                            entregas_realizadas = 0
+                            for o in orders:
+                                if o.destination == destino and o.status != "delivered":
+                                    o.complete(route_cost=cost)
+                                    entregas_realizadas += 1
+
+                                    # Actualiza al cliente en el hash map
+                                    cliente_obj = clientes.get(o.client_id)
+                                    if cliente_obj:
+                                        setattr(cliente_obj, "delivered", True)
+
+                            if entregas_realizadas > 0:
+                                st.success(f"📦 {entregas_realizadas} entrega(s) marcadas como completadas.")
+                            else:
+                                st.info("✅ No hay entregas pendientes para ese destino.")
+
                     except nx.NetworkXNoPath:
-                        st.error("❌ No existe una ruta entre esos nodos.")
+                        st.error("❌ No existe una ruta posible desde ese origen hasta ese destino.")
                 draw_network(nx_graph, path)
 
-    # 3. Clientes
+    # 3. Clients & Orders
     with tabs[2]:
-        st.header("👤 Gestión de Clientes")
-        st.info("Información relacionada a los clientes y su historial de pedidos.")
+        st.header("🌐 Clients and Orders")
+        st.markdown("#### Clients")
         if "last_simulation" in st.session_state:
             clientes = st.session_state["last_simulation"]["clientes"]
-            data = [{"Cliente": k, "Pedidos": v["pedidos"]} for k, v in clientes.items()]
-            st.dataframe(data)
+            clientes_data = []
+            for bucket in clientes._table:
+                if bucket:
+                    for _, client in bucket:
+                        clientes_data.append({
+                            "client_id": client.client_id,
+                            "name": client.name,
+                            "type": client.type,
+                            "total_orders": client.total_orders,
+                            "delivered": getattr(client, "delivered", False)
+                        })
+            st.json(clientes_data)
 
-    # 4. Órdenes
-    with tabs[3]:
-        st.header("📦 Órdenes y Estados")
-        if "last_simulation" in st.session_state:
+            st.markdown("#### Orders")
             orders = st.session_state["last_simulation"]["orders"]
-            st.dataframe(orders)
+            orders_data = [o.to_dict() for o in orders]
+            st.json(orders_data)
 
-    # 5. Estadísticas
+    # 4. Route Analytics
+    with tabs[3]:
+        st.header("📋 Route Analytics")
+        st.info("Coming soon: AVL visualization of most frequent routes.")
+
+    # 5. Statistics
     with tabs[4]:
-        st.header("📊 Estadísticas del Sistema")
-        st.info("Frecuencia de uso de nodos, rutas frecuentes, y análisis de entregas.")
-        st.markdown("📈 En desarrollo...")
+        st.header("📈 General Statistics")
+        if "last_simulation" in st.session_state:
+            sim = st.session_state["last_simulation"]
+            fig = plot_node_distribution(
+                len(sim["storage_nodes"]),
+                len(sim["recharge_nodes"]),
+                len(sim["client_nodes"])
+            )
+            st.pyplot(fig)
+        else:
+            st.warning("You need to run a simulation first.")
 
 if __name__ == "__main__":
     main()
