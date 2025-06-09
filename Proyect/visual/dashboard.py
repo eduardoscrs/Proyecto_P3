@@ -2,13 +2,23 @@ import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
 from Proyect.sim.simulation import run_simulation_dynamic
+import matplotlib.pyplot as plt
+import networkx as nx
+from matplotlib.patches import Patch
 
+def plot_node_distribution(num_storage, num_recharge, num_clientes):
+    labels = ['Almacenamiento', 'Recarga', 'Cliente']
+    values = [num_storage, num_recharge, num_clientes]
+    colors = ['#f39c12', '#3498db', '#2ecc71']
+
+    fig, ax = plt.subplots()
+    ax.pie(values, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')
+    ax.set_title("Distribución de tipos de nodos")
+
+    return fig
 
 def draw_network(nx_graph, path=None):
-    import matplotlib.pyplot as plt
-    import networkx as nx
-    from matplotlib.patches import Patch
-
     tipo_color = {
         "almacenamiento": "#f39c12",  # naranja
         "recarga": "#3498db",         # azul
@@ -146,7 +156,17 @@ def main():
     with tabs[4]:
         st.header("📊 Estadísticas del Sistema")
         st.info("Frecuencia de uso de nodos, rutas frecuentes, y análisis de entregas.")
-        st.markdown("📈 En desarrollo...")
+        if "last_simulation" in st.session_state:
+            sim = st.session_state["last_simulation"]
+            fig = plot_node_distribution(
+                len(sim["storage_nodes"]),
+                len(sim["recharge_nodes"]),
+                len(sim["client_nodes"])
+            )
+            st.pyplot(fig)
+        else:
+            st.warning("⚠️ Debes ejecutar una simulación primero para ver estadísticas.")
+
 
 if __name__ == "__main__":
     main()
