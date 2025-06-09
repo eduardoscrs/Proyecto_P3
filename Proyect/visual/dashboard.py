@@ -3,7 +3,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from Proyect.sim.simulation import run_simulation_dynamic
 from matplotlib.patches import Patch
-
+from Proyect.tda.avl import to_networkx
 # ---------- UTILS ----------
 def plot_node_distribution(num_storage, num_recharge, num_clientes):
     labels = ['Storage', 'Recharge', 'Client']
@@ -146,7 +146,32 @@ def main():
     # 4. Route Analytics
     with tabs[3]:
         st.header("📋 Route Analytics")
-        st.info("Coming soon: AVL visualization of most frequent routes.")
+
+        if "route_avl_root" not in st.session_state:
+            st.info("No routes recorded yet. Calcula una ruta primero.")
+        else:
+            avl_root = st.session_state["route_avl_root"]
+            G = to_networkx(avl_root)
+
+            st.subheader("🌿 Rutas Frecuentes (AVL In-Order)")
+            frecuencias = []
+
+            def in_order_list(node):
+                if node:
+                    in_order_list(node.left)
+                    frecuencias.append((node.key, node.value))
+                    in_order_list(node.right)
+
+            in_order_list(avl_root)
+
+            for i, (ruta, freq) in enumerate(frecuencias, 1):
+                st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
+
+            st.subheader("🌳 AVL Visual (Rutas)")
+            pos = nx.nx_agraph.graphviz_layout(G, prog='dot')
+            plt.figure(figsize=(10, 6))
+            nx.draw(G, pos, with_labels=True, node_color="#8ecae6", node_size=1800, font_size=9)
+            st.pyplot(plt.gcf())
 
     # 5. Statistics
     with tabs[4]:
