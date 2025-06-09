@@ -47,8 +47,28 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
         graph.insert_vertex(name, node_type="cliente")
         nx_graph.add_node(name, tipo="cliente")
 
-    # Insertar aristas aleatorias
+# Conectar todos los nodos asegurando que el grafo sea conexo
     added_edges = set()
+    connected = set()
+    available = list(node_names)
+    random.shuffle(available)
+
+    # Conectar como un árbol (n - 1 aristas)
+    first = available.pop()
+    connected.add(first)
+
+    while available:
+        u = random.choice(list(connected))
+        v = available.pop()
+        weight = random.randint(5, 30)
+        u_vertex = graph.get_vertex(u)
+        v_vertex = graph.get_vertex(v)
+        graph.insert_edge(u_vertex, v_vertex, weight)
+        nx_graph.add_edge(u, v, weight=weight)
+        added_edges.add((u, v))
+        connected.add(v)
+
+    # Añadir aristas adicionales si es necesario
     while len(added_edges) < num_edges:
         u, v = random.sample(node_names, 2)
         if (u, v) not in added_edges and u != v:
