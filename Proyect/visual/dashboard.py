@@ -2,47 +2,70 @@ import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
 from Proyect.sim.simulation import run_simulation_dynamic
+import matplotlib.pyplot as plt
+import networkx as nx
+from matplotlib.patches import Patch
+
+def plot_node_distribution(num_storage, num_recharge, num_clientes):
+    labels = ['Almacenamiento', 'Recarga', 'Cliente']
+    values = [num_storage, num_recharge, num_clientes]
+    colors = ['#f39c12', '#3498db', '#2ecc71']
+
+    fig, ax = plt.subplots()
+    ax.pie(values, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')
+    ax.set_title("Distribución de tipos de nodos")
+
+    return fig
 
 def draw_network(nx_graph, path=None):
-    import matplotlib.pyplot as plt
-    import networkx as nx
-
     tipo_color = {
-        "almacenamiento": "#f39c12",
-        "recarga": "#3498db",
-        "cliente": "#2ecc71"
+        "almacenamiento": "#f39c12",  # naranja
+        "recarga": "#3498db",         # azul
+        "cliente": "#2ecc71"          # verde
     }
 
     num_nodes = nx_graph.number_of_nodes()
 
     # Layout adaptativo
-    if num_nodes <= 30:
-        pos = nx.spring_layout(nx_graph, seed=42)
-    elif num_nodes <= 100:
-        pos = nx.kamada_kawai_layout(nx_graph)
-    else:
-        pos = nx.shell_layout(nx_graph)  # Más ordenado en nodos grandes
+    try:
+        if num_nodes <= 30:
+            pos = nx.spring_layout(nx_graph, seed=42)
+        elif num_nodes <= 100:
+            pos = nx.kamada_kawai_layout(nx_graph)
+        else:
+            pos = nx.shell_layout(nx_graph)
+    except:
+        pos = nx.spring_layout(nx_graph, seed=42)  # Fallback si falta scipy
 
     node_colors = [tipo_color.get(nx_graph.nodes[n].get("tipo", ""), "#95a5a6") for n in nx_graph.nodes]
     edge_colors = ["red" if path and (u, v) in zip(path, path[1:]) else "gray" for u, v in nx_graph.edges]
 
-    # Tamaño dinámico
+    # Tamaño adaptativo
     node_size = 800 if num_nodes <= 30 else 400 if num_nodes <= 100 else 200
     font_size = 10 if num_nodes <= 30 else 8 if num_nodes <= 100 else 6
 
-    plt.figure(figsize=(12, 8 if num_nodes <= 100 else 10))
+    plt.figure(figsize=(12, 9))
     nx.draw(nx_graph, pos, with_labels=True,
             node_color=node_colors,
             edge_color=edge_colors,
             node_size=node_size,
-            width=1.8,
+            width=2.5,
             font_size=font_size,
             font_weight='bold')
 
-    # Etiquetas de peso solo para grafos pequeños
+    # Mostrar etiquetas de aristas solo si hay pocos nodos
     if num_nodes <= 50:
         edge_labels = nx.get_edge_attributes(nx_graph, 'weight')
         nx.draw_networkx_edge_labels(nx_graph, pos, edge_labels=edge_labels, font_size=font_size)
+
+    # Añadir leyenda
+    legend_elements = [
+        Patch(facecolor=tipo_color["almacenamiento"], label="Almacenamiento"),
+        Patch(facecolor=tipo_color["recarga"], label="Recarga"),
+        Patch(facecolor=tipo_color["cliente"], label="Cliente"),
+    ]
+    plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
 
     st.pyplot(plt.gcf())
 
@@ -133,7 +156,17 @@ def main():
     with tabs[4]:
         st.header("📊 Estadísticas del Sistema")
         st.info("Frecuencia de uso de nodos, rutas frecuentes, y análisis de entregas.")
-        st.markdown("📈 En desarrollo...")
+        if "last_simulation" in st.session_state:
+            sim = st.session_state["last_simulation"]
+            fig = plot_node_distribution(
+                len(sim["storage_nodes"]),
+                len(sim["recharge_nodes"]),
+                len(sim["client_nodes"])
+            )
+            st.pyplot(fig)
+        else:
+            st.warning("⚠️ Debes ejecutar una simulación primero para ver estadísticas.")
+
 
 if __name__ == "__main__":
     main()
