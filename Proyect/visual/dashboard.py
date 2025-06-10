@@ -1,9 +1,9 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
-from Proyect.sim.simulation import run_simulation_dynamic
 from matplotlib.patches import Patch
-from Proyect.tda.avl import to_networkx
+from Proyect.sim.simulation import run_simulation_dynamic
+
 # ---------- UTILS ----------
 def plot_node_distribution(num_storage, num_recharge, num_clientes):
     labels = ['Storage', 'Recharge', 'Client']
@@ -97,6 +97,7 @@ def main():
         if st.button("🟢 Start Simulation"):
             result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
             st.session_state["last_simulation"] = result
+            st.session_state["completed_deliveries"] = []
             st.success("Simulation completed!")
 
     # 2. Explore Network
@@ -113,32 +114,44 @@ def main():
                 origen = st.selectbox("Origin Node", node_options)
                 destino = st.selectbox("Destination Node", node_options, index=1)
                 calcular = st.button("🚀 Calculate Route")
+
             with col2:
                 st.subheader("🌐 Graph View")
-                path = None
+
+                path = None  # <- aseguramos que siempre exista la variable
+
                 if origen != destino and calcular:
                     try:
-                        path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
-                        cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
-                        st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
+                        if not nx.has_path(nx_graph, origen, destino):
+                            st.error("❌ No existe una ruta posible desde ese origen hasta ese destino.")
+                        else:
+                            path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
+                            cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
+                            st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
 
-                        # ✅ Botón para completar pedido
-                        if path:
-                            if st.button("📦 Complete Delivery and Create Order"):
-                                ruta_str = " → ".join(path)
-                                st.success(f"Order created with route: {ruta_str}")
-                                
-                                from Proyect.tda.avl import AVLTree
-                                if "avl_tree" not in st.session_state:
-                                    st.session_state.avl_tree = AVLTree()
-                                    st.session_state.avl_root = None
+                            if st.button("✅ Completar Entrega"):
+                                orders = st.session_state["last_simulation"]["orders"]
+                                clientes = st.session_state["last_simulation"]["clientes"]
 
-                                tree = st.session_state.avl_tree
-                                st.session_state.avl_root = tree.insert(st.session_state.avl_root, ruta_str)
+                                entregas_realizadas = 0
+                                for o in orders:
+                                    if o.destination == destino and o.status != "delivered":
+                                        o.complete(route_cost=cost)
+                                        entregas_realizadas += 1
 
-                    except nx.NetworkXNoPath:
-                        st.error("No path found.")
-                
+                                        # Actualiza al cliente en el hash map
+                                        cliente_obj = clientes.get(o.client_id)
+                                        if cliente_obj:
+                                            setattr(cliente_obj, "delivered", True)
+
+                                if entregas_realizadas > 0:
+                                    st.success(f"📦 {entregas_realizadas} entrega(s) marcadas como completadas.")
+                                else:
+                                    st.info("✅ No hay entregas pendientes para ese destino.")
+                    except Exception as e:
+                        st.error(f"Error al calcular ruta: {e}")
+
+                # 🔧 Mostrar siempre el grafo, con o sin path
                 draw_network(nx_graph, path)
 
     # 3. Clients & Orders
@@ -151,7 +164,13 @@ def main():
             for bucket in clientes._table:
                 if bucket:
                     for _, client in bucket:
-                        clientes_data.append(client.to_dict())
+                        clientes_data.append({
+                            "client_id": client.client_id,
+                            "name": client.name,
+                            "type": client.type,
+                            "total_orders": client.total_orders,
+                            "delivered": getattr(client, "delivered", False)
+                        })
             st.json(clientes_data)
 
             st.markdown("#### Orders")
@@ -162,32 +181,7 @@ def main():
     # 4. Route Analytics
     with tabs[3]:
         st.header("📋 Route Analytics")
-
-        if "route_avl_root" not in st.session_state:
-            st.info("No routes recorded yet. Calcula una ruta primero.")
-        else:
-            avl_root = st.session_state["route_avl_root"]
-            G = to_networkx(avl_root)
-
-            st.subheader("🌿 Rutas Frecuentes (AVL In-Order)")
-            frecuencias = []
-
-            def in_order_list(node):
-                if node:
-                    in_order_list(node.left)
-                    frecuencias.append((node.key, node.value))
-                    in_order_list(node.right)
-
-            in_order_list(avl_root)
-
-            for i, (ruta, freq) in enumerate(frecuencias, 1):
-                st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
-
-            st.subheader("🌳 AVL Visual (Rutas)")
-            pos = nx.nx_agraph.graphviz_layout(G, prog='dot')
-            plt.figure(figsize=(10, 6))
-            nx.draw(G, pos, with_labels=True, node_color="#8ecae6", node_size=1800, font_size=9)
-            st.pyplot(plt.gcf())
+        st.info("Coming soon: AVL visualization of most frequent routes.")
 
     # 5. Statistics
     with tabs[4]:

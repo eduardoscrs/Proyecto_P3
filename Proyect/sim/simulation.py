@@ -2,17 +2,18 @@ import networkx as nx
 import random
 from Proyect.model.graph import Graph
 from Proyect.tda.hash_map import Map
-from Proyect.tda import avl
+from Proyect.tda.avl import AVLTree
 from Proyect.model.graph_utils import bfs
 from Proyect.domain.client import Client
 from Proyect.domain.order import Order
+from Proyect.domain.route import Route
 
 
 def run_simulation_dynamic(num_nodes, num_edges, num_orders):
     nx_graph = nx.DiGraph()
     graph = Graph(directed=True)
 
-    # Asignar roles: 20% almacenamiento, 20% recarga, 60% cliente
+    # Asignar roles
     num_storage = int(num_nodes * 0.2)
     num_recharge = int(num_nodes * 0.2)
     num_client = num_nodes - num_storage - num_recharge
@@ -33,10 +34,9 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
     random.shuffle(node_names)
 
     storage_nodes = node_names[:num_storage]
-    recharge_nodes = node_names[num_storage:num_storage+num_recharge]
-    client_nodes = node_names[num_storage+num_recharge:]
+    recharge_nodes = node_names[num_storage:num_storage + num_recharge]
+    client_nodes = node_names[num_storage + num_recharge:]
 
-    # Insertar nodos
     for name in storage_nodes:
         graph.insert_vertex(name, node_type="almacenamiento")
         nx_graph.add_node(name, tipo="almacenamiento")
@@ -47,8 +47,29 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
         graph.insert_vertex(name, node_type="cliente")
         nx_graph.add_node(name, tipo="cliente")
 
-    # Insertar aristas aleatorias
+    # Conectar nodos de forma fuerte (ida y vuelta)
     added_edges = set()
+    connected = set()
+    available = list(node_names)
+    random.shuffle(available)
+
+    first = available.pop()
+    connected.add(first)
+
+    while available:
+        u = random.choice(list(connected))
+        v = available.pop()
+        weight = random.randint(5, 30)
+        u_vertex = graph.get_vertex(u)
+        v_vertex = graph.get_vertex(v)
+        graph.insert_edge(u_vertex, v_vertex, weight)
+        graph.insert_edge(v_vertex, u_vertex, weight)  # bidireccional
+        nx_graph.add_edge(u, v, weight=weight)
+        nx_graph.add_edge(v, u, weight=weight)
+        added_edges.add((u, v))
+        added_edges.add((v, u))
+        connected.add(v)
+
     while len(added_edges) < num_edges:
         u, v = random.sample(node_names, 2)
         if (u, v) not in added_edges and u != v:
@@ -56,12 +77,17 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
             u_vertex = graph.get_vertex(u)
             v_vertex = graph.get_vertex(v)
             graph.insert_edge(u_vertex, v_vertex, weight)
+            graph.insert_edge(v_vertex, u_vertex, weight)
             nx_graph.add_edge(u, v, weight=weight)
+            nx_graph.add_edge(v, u, weight=weight)
             added_edges.add((u, v))
+            added_edges.add((v, u))
 
-    # Generar pedidos (Order)
-    pedido_avl_root = None
+    # AVL de pedidos y rutas
+    pedido_avl = AVLTree()
+    route_avl = AVLTree()
     orders = []
+
     for i in range(num_orders):
         origin = random.choice(storage_nodes)
         destination = random.choice(client_nodes)
@@ -79,10 +105,19 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
             priority=priority
         )
 
-        pedido_avl_root = avl.insert(pedido_avl_root, int(order_id))
+        pedido_avl.insert(int(order_id))
         orders.append(order)
 
-    # Guardar clientes como objetos
+        # Buscar ruta válida con bfs (considerando autonomía)
+        try:
+            path = bfs(graph, origin, destination, max_cost=50)
+            if path:
+                route = Route(path, cost=len(path))
+                route_avl.insert(route)
+        except Exception:
+            pass  # rutas no válidas se ignoran
+
+    # Clientes en hash map
     clientes = Map()
     for name in client_nodes:
         client = Client(client_id=name, name=f"Client{name}")
@@ -99,5 +134,6 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
         "client_nodes": client_nodes,
         "recharge_nodes": recharge_nodes,
         "clientes": clientes,
-        "pedido_avl_root": pedido_avl_root
+        "pedido_avl_root": pedido_avl.root,
+        "route_avl": route_avl
     }
