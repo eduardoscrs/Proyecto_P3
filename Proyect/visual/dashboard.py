@@ -121,8 +121,24 @@ def main():
                         path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
                         cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
                         st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
+
+                        # ✅ Botón para completar pedido
+                        if path:
+                            if st.button("📦 Complete Delivery and Create Order"):
+                                ruta_str = " → ".join(path)
+                                st.success(f"Order created with route: {ruta_str}")
+                                
+                                from Proyect.tda.avl import AVLTree
+                                if "avl_tree" not in st.session_state:
+                                    st.session_state.avl_tree = AVLTree()
+                                    st.session_state.avl_root = None
+
+                                tree = st.session_state.avl_tree
+                                st.session_state.avl_root = tree.insert(st.session_state.avl_root, ruta_str)
+
                     except nx.NetworkXNoPath:
                         st.error("No path found.")
+                
                 draw_network(nx_graph, path)
 
     # 3. Clients & Orders
