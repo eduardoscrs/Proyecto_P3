@@ -56,6 +56,7 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
     first = available.pop()
     connected.add(first)
 
+    # Conectar como un árbol (n - 1 aristas)
     while available:
         u = random.choice(list(connected))
         v = available.pop()
@@ -77,7 +78,7 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
             u_vertex = graph.get_vertex(u)
             v_vertex = graph.get_vertex(v)
             graph.insert_edge(u_vertex, v_vertex, weight)
-            graph.insert_edge(v_vertex, u_vertex, weight)
+            graph.insert_edge(v_vertex, u_vertex, weight)  # bidireccional
             nx_graph.add_edge(u, v, weight=weight)
             nx_graph.add_edge(v, u, weight=weight)
             added_edges.add((u, v))
