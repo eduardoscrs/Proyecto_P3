@@ -1,9 +1,10 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
-from Proyect.sim.simulation import run_simulation_dynamic
 from matplotlib.patches import Patch
-from Proyect.tda.avl import to_networkx
+# from Proyect.tda.avl import to_networkx
+from Proyect.sim.simulation import run_simulation_dynamic
+
 # ---------- UTILS ----------
 def plot_node_distribution(num_storage, num_recharge, num_clientes):
     labels = ['Storage', 'Recharge', 'Client']
@@ -97,6 +98,7 @@ def main():
         if st.button("🟢 Start Simulation"):
             result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
             st.session_state["last_simulation"] = result
+            st.session_state["completed_deliveries"] = []
             st.success("Simulation completed!")
 
     # 2. Explore Network
@@ -113,16 +115,44 @@ def main():
                 origen = st.selectbox("Origin Node", node_options)
                 destino = st.selectbox("Destination Node", node_options, index=1)
                 calcular = st.button("🚀 Calculate Route")
+
             with col2:
                 st.subheader("🌐 Graph View")
-                path = None
+
+                path = None  # <- aseguramos que siempre exista la variable
+
                 if origen != destino and calcular:
                     try:
-                        path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
-                        cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
-                        st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
-                    except nx.NetworkXNoPath:
-                        st.error("No path found.")
+                        if not nx.has_path(nx_graph, origen, destino):
+                            st.error("❌ No existe una ruta posible desde ese origen hasta ese destino.")
+                        else:
+                            path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
+                            cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
+                            st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
+
+                            if st.button("✅ Completar Entrega"):
+                                orders = st.session_state["last_simulation"]["orders"]
+                                clientes = st.session_state["last_simulation"]["clientes"]
+
+                                entregas_realizadas = 0
+                                for o in orders:
+                                    if o.destination == destino and o.status != "delivered":
+                                        o.complete(route_cost=cost)
+                                        entregas_realizadas += 1
+
+                                        # Actualiza al cliente en el hash map
+                                        cliente_obj = clientes.get(o.client_id)
+                                        if cliente_obj:
+                                            setattr(cliente_obj, "delivered", True)
+
+                                if entregas_realizadas > 0:
+                                    st.success(f"📦 {entregas_realizadas} entrega(s) marcadas como completadas.")
+                                else:
+                                    st.info("✅ No hay entregas pendientes para ese destino.")
+                    except Exception as e:
+                        st.error(f"Error al calcular ruta: {e}")
+
+                # 🔧 Mostrar siempre el grafo, con o sin path
                 draw_network(nx_graph, path)
 
     # 3. Clients & Orders
@@ -135,7 +165,13 @@ def main():
             for bucket in clientes._table:
                 if bucket:
                     for _, client in bucket:
-                        clientes_data.append(client.to_dict())
+                        clientes_data.append({
+                            "client_id": client.client_id,
+                            "name": client.name,
+                            "type": client.type,
+                            "total_orders": client.total_orders,
+                            "delivered": getattr(client, "delivered", False)
+                        })
             st.json(clientes_data)
 
             st.markdown("#### Orders")
