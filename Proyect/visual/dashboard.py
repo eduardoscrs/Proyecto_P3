@@ -5,7 +5,7 @@ from matplotlib.patches import Patch
 from Proyect.sim.simulation import run_simulation_dynamic
 from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
-
+import pandas as pd
 # ---------- UTILS ----------
 def plot_node_distribution(num_storage, num_recharge, num_clientes):
     labels = ['Storage', 'Recharge', 'Client']
@@ -113,9 +113,11 @@ def main():
         if "last_simulation" not in st.session_state:
             st.warning("Initialize a simulation first.")
         else:
-            nx_graph = st.session_state["last_simulation"]["nx_graph"]
+            sim_data = st.session_state["last_simulation"]
+            nx_graph = sim_data["nx_graph"]
             node_options = list(nx_graph.nodes)
             col1, col2 = st.columns([0.35, 0.65])
+
             with col1:
                 st.subheader("📌 Calculate Route")
                 origen = st.selectbox("Origin Node", node_options)
@@ -124,20 +126,64 @@ def main():
 
             with col2:
                 st.subheader("🌐 Graph View")
-                if calcular and origen != destino:
+                path = None
+                if origen != destino and calcular:
                     try:
                         if not nx.has_path(nx_graph, origen, destino):
-                            st.error("❌ No existe una ruta posible.")
+                            st.error("❌ No existe una ruta posible desde ese origen hasta ese destino.")
                         else:
                             path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
                             cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
-                            st.session_state["last_path"] = path
-                            st.session_state["last_cost"] = cost
                             st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
 
-                draw_network(nx_graph, st.session_state.get("last_path"))
+                            # Botón para crear orden y marcarla como entregada
+                            if st.button("📝 Crear Orden y Completar Entrega"):
+                                orders = sim_data["orders"]
+                                clientes = sim_data["clientes"]
+                                pedido_avl_root = sim_data.get("pedido_avl_root")
+                                route_avl = sim_data.get("route_avl")
+
+                                order_id = f"{len(orders) + 100}"
+                                client_id = destino
+                                client_name = f"Client{client_id}"
+
+                                from Proyect.domain.order import Order
+                                from Proyect.domain.route import Route
+                                from Proyect.tda import avl
+
+                                # Crear nueva orden
+                                new_order = Order(
+                                    order_id=order_id,
+                                    client=client_name,
+                                    client_id=client_id,
+                                    origin=origen,
+                                    destination=destino,
+                                    priority=1
+                                )
+                                new_order.complete(route_cost=cost)
+                                orders.append(new_order)
+
+                                # Insertar la orden en el AVL de pedidos
+                                pedido_avl_root = avl.insert(pedido_avl_root, int(order_id))
+                                sim_data["pedido_avl_root"] = pedido_avl_root
+
+                                # Insertar la ruta en el AVL de rutas
+                                if route_avl:
+                                    route_avl.insert(Route(path, cost))
+                                sim_data["route_avl"] = route_avl
+
+                                # Actualizar cliente
+                                cliente_obj = clientes.get(client_id)
+                                if cliente_obj:
+                                    cliente_obj.add_order()
+                                    setattr(cliente_obj, "delivered", True)
+
+                                st.success("📝 Orden creada y entrega completada exitosamente.")
+                    except Exception as e:
+                        st.error(f"Error al calcular ruta: {e}")
+
+                # Mostrar siempre el grafo, con o sin ruta
+                draw_network(nx_graph, path)
 
     # 3. Clients & Orders
     with tabs[2]:
@@ -166,19 +212,54 @@ def main():
             st.subheader("🌳 AVL Visual (Rutas)")
             draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
 
+
     # 5. Statistics
     with tabs[4]:
         st.header("📈 General Statistics")
         if "last_simulation" in st.session_state:
             sim = st.session_state["last_simulation"]
-            fig = plot_node_distribution(
-                len(sim["storage_nodes"]),
-                len(sim["recharge_nodes"]),
-                len(sim["client_nodes"])
-            )
+
+            # Crear columnas para los gráficos de barras
+            col1, col2, col3 = st.columns(3)
+
+            # Bar Chart - Most Visited Clients
+            with col1:
+                st.subheader("Most Visited Clients")
+                most_visited_clients = {k: v for k, v in sim["clientes"].items() if hasattr(v, 'total_orders')}
+                most_visited_clients = sorted(most_visited_clients.items(), key=lambda x: x[1].total_orders, reverse=True)
+                client_labels = [client[0] for client in most_visited_clients]
+                client_values = [client[1].total_orders for client in most_visited_clients]
+                client_data = pd.DataFrame({'Client': client_labels, 'Visits': client_values})
+                st.bar_chart(client_data.set_index('Client'))
+
+            # Bar Chart - Most Visited Recharge Stations
+            with col2:
+                st.subheader("Most Visited Recharge Stations")
+                most_visited_recharge = {node: sim["nx_graph"].degree(node) for node in sim["recharge_nodes"]}
+                recharge_data = pd.DataFrame(list(most_visited_recharge.items()), columns=['Station', 'Visits'])
+                st.bar_chart(recharge_data.set_index('Station'))
+
+            # Bar Chart - Most Visited Storage Nodes
+            with col3:
+                st.subheader("Most Visited Storage Nodes")
+                most_visited_storage = {node: sim["nx_graph"].degree(node) for node in sim["storage_nodes"]}
+                storage_data = pd.DataFrame(list(most_visited_storage.items()), columns=['Storage Node', 'Visits'])
+                st.bar_chart(storage_data.set_index('Storage Node'))
+
+            # Node Distribution Pie Chart (after bar charts)
+            st.subheader("Node Role Distribution")
+            fig, ax = plt.subplots(figsize=(5, 5))  # Reducido tamaño del gráfico de pastel
+            labels = ['Storage', 'Recharge', 'Client']
+            values = [len(sim["storage_nodes"]), len(sim["recharge_nodes"]), len(sim["client_nodes"])]
+            colors = ['#f39c12', '#3498db', '#2ecc71']
+            ax.pie(values, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
+            ax.set_title("Node Role Distribution")
             st.pyplot(fig)
+
         else:
             st.warning("You need to run a simulation first.")
+
 
 if __name__ == "__main__":
     main()
