@@ -93,6 +93,15 @@ def main():
 
         if st.button("🟢 Start Simulation"):
             result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
+            avl_tree = AVLTree()
+            try:
+                for order in result["orders"]:
+                    path = nx.shortest_path(result["nx_graph"], order.origin, order.destination, weight="weight")
+                    route_str = " → ".join(path)
+                    avl_tree.insert(route_str)
+            except:
+                pass
+            result["route_avl"] = avl_tree
             st.session_state["last_simulation"] = result
             st.session_state.pop("last_path", None)
             st.session_state.pop("last_cost", None)
@@ -127,30 +136,6 @@ def main():
                             st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
                     except Exception as e:
                         st.error(f"Error: {e}")
-
-                if st.button("✅ Completar Entrega") and "last_path" in st.session_state:
-                    path = st.session_state["last_path"]
-                    cost = st.session_state["last_cost"]
-                    orders = st.session_state["last_simulation"]["orders"]
-                    clientes = st.session_state["last_simulation"]["clientes"]
-                    entregas_realizadas = 0
-
-                    for o in orders:
-                        if o.destination == destino and o.status != "delivered":
-                            o.complete(route_cost=cost)
-                            entregas_realizadas += 1
-                            cliente_obj = clientes.get(o.client_id)
-                            if cliente_obj:
-                                setattr(cliente_obj, "delivered", True)
-
-                    if entregas_realizadas > 0:
-                        st.success(f"📦 {entregas_realizadas} entrega(s) completadas.")
-                        route_str = " → ".join(path)
-                        if "route_avl" not in st.session_state["last_simulation"]:
-                            st.session_state["last_simulation"]["route_avl"] = AVLTree()
-                        st.session_state["last_simulation"]["route_avl"].insert(route_str)
-                    else:
-                        st.info("No hay entregas pendientes para ese destino.")
 
                 draw_network(nx_graph, st.session_state.get("last_path"))
 
