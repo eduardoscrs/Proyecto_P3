@@ -24,7 +24,9 @@ def draw_network(nx_graph, path=None):
         "recarga": "#3498db",
         "cliente": "#2ecc71"
     }
+
     num_nodes = nx_graph.number_of_nodes()
+
     try:
         if num_nodes <= 30:
             pos = nx.spring_layout(nx_graph, seed=42)
@@ -36,29 +38,43 @@ def draw_network(nx_graph, path=None):
         pos = nx.spring_layout(nx_graph, seed=42)
 
     node_colors = [tipo_color.get(nx_graph.nodes[n].get("tipo", ""), "#95a5a6") for n in nx_graph.nodes]
+    
+    # Aquí cambiamos el color de las aristas para resaltar el camino
     edge_colors = ["red" if path and (u, v) in zip(path, path[1:]) else "gray" for u, v in nx_graph.edges]
+    
+    # Aumentamos el grosor de las aristas para mejorar la visibilidad
+    edge_widths = [3 if path and (u, v) in zip(path, path[1:]) else 1 for u, v in nx_graph.edges]
+    
     node_size = 800 if num_nodes <= 30 else 400 if num_nodes <= 100 else 200
     font_size = 10 if num_nodes <= 30 else 8 if num_nodes <= 100 else 6
 
     plt.figure(figsize=(12, 9))
+
+    # Dibuja el grafo con aristas de grosor variable según el camino
     nx.draw(nx_graph, pos, with_labels=True,
             node_color=node_colors,
             edge_color=edge_colors,
             node_size=node_size,
-            width=2.5,
+            width=edge_widths,  # Aquí aplicamos el grosor de las aristas
             font_size=font_size,
             font_weight='bold')
+
+    # Dibuja las etiquetas de las aristas solo si el número de nodos es pequeño
     if num_nodes <= 50:
         edge_labels = nx.get_edge_attributes(nx_graph, 'weight')
         nx.draw_networkx_edge_labels(nx_graph, pos, edge_labels=edge_labels, font_size=font_size)
 
+    # Leyenda de los nodos según tipo
     legend_elements = [
         Patch(facecolor=tipo_color["almacenamiento"], label="Storage"),
         Patch(facecolor=tipo_color["recarga"], label="Recharge"),
         Patch(facecolor=tipo_color["cliente"], label="Client"),
     ]
     plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
+
+    # Muestra el grafo
     st.pyplot(plt.gcf())
+
 
 # ---------- MAIN APP ----------
 def main():

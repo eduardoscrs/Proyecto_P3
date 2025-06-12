@@ -8,7 +8,6 @@ from Proyect.domain.client import Client
 from Proyect.domain.order import Order
 from Proyect.domain.route import Route
 
-
 def run_simulation_dynamic(num_nodes, num_edges, num_orders):
     nx_graph = nx.DiGraph()
     graph = Graph(directed=True)
