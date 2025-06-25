@@ -6,6 +6,23 @@ from Proyect.sim.simulation import run_simulation_dynamic
 from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
 import pandas as pd
+
+import requests
+import streamlit as st
+
+def start_simulation(num_nodes, num_edges, num_orders):
+    url = "http://localhost:8000/run_simulation/"
+    response = requests.post(url, json={
+        "num_nodes": num_nodes,
+        "num_edges": num_edges,
+        "num_orders": num_orders
+    })
+    return response.json()
+
+if st.button("Start Simulation"):
+    result = start_simulation(num_nodes=15, num_edges=20, num_orders=10)
+    st.write(result)
+
 # ---------- UTILS ----------
 def plot_node_distribution(num_storage, num_recharge, num_clientes):
     labels = ['Storage', 'Recharge', 'Client']
