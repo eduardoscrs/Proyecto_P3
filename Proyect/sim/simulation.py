@@ -127,10 +127,16 @@ def run_simulation_dynamic(num_nodes, num_edges, num_orders):
                 client.add_order()
         clientes.put(name, client)
 
+    # Órdenes en hash map
+    orders_map = Map()
+    for order in orders:
+        orders_map.put(order.order_id, order)
+
     return {
         "nx_graph": nx_graph,
         "graph": graph,
         "orders": orders,
+        "orders_map": orders_map,
         "storage_nodes": storage_nodes,
         "client_nodes": client_nodes,
         "recharge_nodes": recharge_nodes,
