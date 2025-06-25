@@ -206,15 +206,37 @@ def main():
         st.header("🌐 Clients and Orders")
         if "last_simulation" in st.session_state:
             clientes = st.session_state["last_simulation"]["clientes"]
+            orders_map = st.session_state["last_simulation"]["orders_map"]
             clientes_data = [v.to_dict() for _, v in clientes.items()]
-            st.subheader("Clients")
+            st.subheader("Clients (from hash map)")
             st.json(clientes_data)
 
             orders = st.session_state["last_simulation"]["orders"]
             orders_data = [o.to_dict() for o in orders]
-            st.subheader("Orders")
+            st.subheader("Orders (from list)")
             st.json(orders_data)
 
+            # --- NUEVO: Buscar cliente y orden por ID usando el hash map ---
+            st.markdown("---")
+            st.subheader("🔎 Buscar Cliente u Orden por ID (usando hash map)")
+            col1, col2 = st.columns(2)
+            with col1:
+                client_id = st.text_input("Client ID para buscar", "")
+                if client_id:
+                    client_obj = clientes.get(client_id)
+                    if client_obj:
+                        st.success(f"Cliente encontrado: {client_obj.to_dict()}")
+                    else:
+                        st.warning("Cliente no encontrado en el hash map.")
+            with col2:
+                order_id = st.text_input("Order ID para buscar", "")
+                if order_id:
+                    order_obj = orders_map.get(order_id)
+                    if order_obj:
+                        st.success(f"Orden encontrada: {order_obj.to_dict()}")
+                    else:
+                        st.warning("Orden no encontrada en el hash map.")
+# ...existing code...
     # 4. Route Analytics
     with tabs[3]:
         st.header("📋 Route Analytics")
