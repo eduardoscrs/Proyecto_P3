@@ -20,13 +20,11 @@ def plot_node_distribution(num_storage, num_recharge, num_clientes):
 
 def draw_network(nx_graph, path=None):
     tipo_color = {
-        "almacenamiento": "#f39c12",  # Naranja
-        "recarga": "#3498db",         # Azul
-        "cliente": "#2ecc71"          # Verde
+        "almacenamiento": "#f39c12",
+        "recarga": "#3498db",
+        "cliente": "#2ecc71"
     }
-
     num_nodes = nx_graph.number_of_nodes()
-
     try:
         if num_nodes <= 30:
             pos = nx.spring_layout(nx_graph, seed=42)
@@ -38,31 +36,18 @@ def draw_network(nx_graph, path=None):
         pos = nx.spring_layout(nx_graph, seed=42)
 
     node_colors = [tipo_color.get(nx_graph.nodes[n].get("tipo", ""), "#95a5a6") for n in nx_graph.nodes]
-    
-    # Cambiar el color de las aristas para resaltar el camino
     edge_colors = ["red" if path and (u, v) in zip(path, path[1:]) else "gray" for u, v in nx_graph.edges]
-    
-    # Aumentar el grosor de las aristas para las de la ruta
-    edge_widths = [4 if path and (u, v) in zip(path, path[1:]) else 1 for u, v in nx_graph.edges]
-
-    # Usar líneas discontinuas para las aristas del camino
-    edge_styles = ['dashed' if path and (u, v) in zip(path, path[1:]) else 'solid' for u, v in nx_graph.edges]
-
     node_size = 800 if num_nodes <= 30 else 400 if num_nodes <= 100 else 200
     font_size = 10 if num_nodes <= 30 else 8 if num_nodes <= 100 else 6
 
     plt.figure(figsize=(12, 9))
-
-    # Dibuja el grafo con aristas de grosor variable según el camino
     nx.draw(nx_graph, pos, with_labels=True,
             node_color=node_colors,
             edge_color=edge_colors,
             node_size=node_size,
-            width=edge_widths,  # Aquí aplicamos el grosor de las aristas
+            width=2.5,
             font_size=font_size,
-            font_weight='bold',
-            style=edge_styles)  # Usamos un estilo de línea discontinuo para el camino
-
+            font_weight='bold')
     if num_nodes <= 50:
         edge_labels = nx.get_edge_attributes(nx_graph, 'weight')
         nx.draw_networkx_edge_labels(nx_graph, pos, edge_labels=edge_labels, font_size=font_size)
@@ -73,7 +58,6 @@ def draw_network(nx_graph, path=None):
         Patch(facecolor=tipo_color["cliente"], label="Client"),
     ]
     plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
-    
     st.pyplot(plt.gcf())
 
 # ---------- MAIN APP ----------
