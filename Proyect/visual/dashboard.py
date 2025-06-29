@@ -1,17 +1,21 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
+import pandas as pd
+import requests
+import streamlit as st
+import folium
 from matplotlib.patches import Patch
 from Proyect.sim.simulation import run_simulation_dynamic
 from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
-import pandas as pd
 
-import requests
-import streamlit as st
+from Proyect.model.graph_utils import dijkstra, reconstruct_path
+
+from streamlit_folium import st_folium
 
 def start_simulation(num_nodes, num_edges, num_orders):
-    url = "http://localhost:8000/run_simulation/"
+    url = "http://localhost:8002/run_simulation/"
     response = requests.post(url, json={
         "num_nodes": num_nodes,
         "num_edges": num_edges,
@@ -126,81 +130,79 @@ def main():
 
     # 2. Explore Network
     with tabs[1]:
-        st.header("🌍 Network Visualization")
+        st.header("🌍 Network Visualization (Folium)")
         if "last_simulation" not in st.session_state:
             st.warning("Initialize a simulation first.")
         else:
             sim_data = st.session_state["last_simulation"]
             nx_graph = sim_data["nx_graph"]
-            node_options = list(nx_graph.nodes)
-            col1, col2 = st.columns([0.35, 0.65])
+            graph = sim_data["graph"]
+            storage_nodes = sim_data["storage_nodes"]
+            client_nodes = sim_data["client_nodes"]
+            node_options_storage = storage_nodes
+            node_options_client = client_nodes
 
+            # Dummy geolocations for demo (replace with real if available)
+            import random
+            random.seed(42)
+            node_coords = {n: (random.uniform(-33.5, -33.3), random.uniform(-70.7, -70.5)) for n in nx_graph.nodes}
+
+            col1, col2 = st.columns([0.35, 0.65])
             with col1:
-                st.subheader("📌 Calculate Route")
-                origen = st.selectbox("Origin Node", node_options)
-                destino = st.selectbox("Destination Node", node_options, index=1)
-                calcular = st.button("🚀 Calculate Route")
+                st.subheader("Select Route")
+                origen = st.selectbox("Origin Node (Storage)", node_options_storage)
+                destino = st.selectbox("Destination Node (Client)", node_options_client)
+                algoritmo = st.radio("Algorithm", ["Dijkstra"], index=0)
+                calcular = st.button("✈️ Calculate Route")
+                show_dijkstra = st.button("🧭 Show Dijkstra Route")
+                show_mst = st.button("🌲 Show MST (Kruskal)")
+                complete_delivery = st.button("✅ Complete Delivery and Create Order")
 
             with col2:
-                st.subheader("🌐 Graph View")
-                path = None
-                if origen != destino and calcular:
-                    try:
-                        if not nx.has_path(nx_graph, origen, destino):
-                            st.error("❌ No existe una ruta posible desde ese origen hasta ese destino.")
-                        else:
-                            path = nx.shortest_path(nx_graph, origen, destino, weight="weight")
-                            cost = nx.shortest_path_length(nx_graph, origen, destino, weight="weight")
-                            st.success(f"Path: {' → '.join(path)} | Cost: {cost}")
-
-                            # Botón para crear orden y marcarla como entregada
-                            if st.button("📝 Crear Orden y Completar Entrega"):
-                                orders = sim_data["orders"]
-                                clientes = sim_data["clientes"]
-                                pedido_avl_root = sim_data.get("pedido_avl_root")
-                                route_avl = sim_data.get("route_avl")
-
-                                order_id = f"{len(orders) + 100}"
-                                client_id = destino
-                                client_name = f"Client{client_id}"
-
-                                from Proyect.domain.order import Order
-                                from Proyect.domain.route import Route
-                                from Proyect.tda import avl
-
-                                # Crear nueva orden
-                                new_order = Order(
-                                    order_id=order_id,
-                                    client=client_name,
-                                    client_id=client_id,
-                                    origin=origen,
-                                    destination=destino,
-                                    priority=1
-                                )
-                                new_order.complete(route_cost=cost)
-                                orders.append(new_order)
-
-                                # Insertar la orden en el AVL de pedidos
-                                pedido_avl_root = avl.insert(pedido_avl_root, int(order_id))
-                                sim_data["pedido_avl_root"] = pedido_avl_root
-
-                                # Insertar la ruta en el AVL de rutas
-                                if route_avl:
-                                    route_avl.insert(Route(path, cost))
-                                sim_data["route_avl"] = route_avl
-
-                                # Actualizar cliente
-                                cliente_obj = clientes.get(client_id)
-                                if cliente_obj:
-                                    cliente_obj.add_order()
-                                    setattr(cliente_obj, "delivered", True)
-
-                                st.success("📝 Orden creada y entrega completada exitosamente.")
-                    except Exception as e:
-                        st.error(f"Error al calcular ruta: {e}")
-
-                # Mostrar siempre el grafo, con o sin ruta
-                draw_network(nx_graph, path)
+                st.subheader("Geographical Map (Folium)")
+                # Inicializar mapa centrado
+                m = folium.Map(location=[-33.4, -70.6], zoom_start=12)
+                # Dibujar nodos
+                for n, (lat, lon) in node_coords.items():
+                    tipo = nx_graph.nodes[n].get("tipo", "")
+                    color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
+                    folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=n).add_to(m)
+                # Dibujar aristas
+                for u, v, d in nx_graph.edges(data=True):
+                    latlngs = [node_coords[u], node_coords[v]]
+                    folium.PolyLine(latlngs, color="#888", weight=2, opacity=0.5, tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
+                # --- NUEVO: Cálculo y visualización separados ---
+                if calcular:
+                    # Calcular ruta con Dijkstra y guardar en sesión, pero NO pintar
+                    origin_v = graph.get_vertex(origen)
+                    destination_v = graph.get_vertex(destino)
+                    from Proyect.model.graph_utils import dijkstra, reconstruct_path
+                    distances, prev = dijkstra(graph, origin_v)
+                    path = reconstruct_path(prev, origin_v, destination_v)
+                    if path:
+                        route_path = [v.element() for v in path]
+                        st.session_state["last_path"] = route_path
+                        st.session_state["last_cost"] = distances[destination_v]
+                        st.success(f"Path: {' → '.join(route_path)} | Cost: {distances[destination_v]}")
+                    else:
+                        st.session_state["last_path"] = None
+                        st.session_state["last_cost"] = None
+                        st.error("❌ No path found.")
+                # Mostrar ruta solo si se presiona el botón de Dijkstra
+                route_path = st.session_state.get("last_path", None)
+                if show_dijkstra:
+                    # Al presionar, borra la ruta anterior y pinta la nueva
+                    if route_path and len(route_path) > 1:
+                        for i in range(len(route_path)-1):
+                            u, v = route_path[i], route_path[i+1]
+                            folium.PolyLine([node_coords[u], node_coords[v]], color="red", weight=5, opacity=0.9).add_to(m)
+                # Mostrar mapa
+                st_folium(m, width=700, height=500)
+                # Resumen de vuelo
+                if route_path:
+                    st.info(f"Resumen de vuelo: Ruta {' → '.join(route_path)}, Distancia: {st.session_state.get('last_cost', '-')}")
+                else:
+                    st.info("Resumen de vuelo: No hay ruta seleccionada.")
 
     # 3. Clients & Orders
     with tabs[2]:
@@ -237,7 +239,6 @@ def main():
                         st.success(f"Orden encontrada: {order_obj.to_dict()}")
                     else:
                         st.warning("Orden no encontrada en el hash map.")
-# ...existing code...
     # 4. Route Analytics
     with tabs[3]:
         st.header("📋 Route Analytics")
