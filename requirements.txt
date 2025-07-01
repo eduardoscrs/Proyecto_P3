@@ -1,4 +1,9 @@
-streamlit>=1.25
-networkx>=2.8
-matplotlib>=3.5
-scipy>=1.10
+streamlit
+matplotlib
+networkx
+pandas
+requests
+folium
+streamlit-folium
+uvicorn
+fastapi
