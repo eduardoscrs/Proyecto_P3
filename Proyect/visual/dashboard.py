@@ -1,17 +1,15 @@
 import streamlit as st
+st.set_page_config(page_title="Drone Logistics Simulator", layout="wide")  # ¡Debe ir primero!
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
-import streamlit as st
 import folium
 from matplotlib.patches import Patch
 from Proyect.sim.simulation import run_simulation_dynamic
 from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
-
 from Proyect.model.graph_utils import dijkstra, reconstruct_path
-
 from streamlit_folium import st_folium
 
 def start_simulation(num_nodes, num_edges, num_orders):
@@ -83,7 +81,6 @@ def draw_network(nx_graph, path=None):
 
 # ---------- MAIN APP ----------
 def main():
-    st.set_page_config(page_title="Drone Logistics Simulator", layout="wide")
     st.title("🚁 Drone Logistics Simulator - Correos Chile")
 
     tabs = st.tabs([
@@ -299,7 +296,3 @@ def main():
 
         else:
             st.warning("You need to run a simulation first.")
-
-
-if __name__ == "__main__":
-    main()
