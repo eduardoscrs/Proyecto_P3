@@ -152,20 +152,21 @@ def main():
         """)
 
         if st.button("🟢 Start Simulation"):
-            result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
-            avl_tree = AVLTree()
-            try:
-                for order in result["orders"]:
-                    path = nx.shortest_path(result["nx_graph"], order.origin, order.destination, weight="weight")
-                    route_str = " → ".join(path)
-                    avl_tree.insert(route_str)
-            except:
-                pass
-            result["route_avl"] = avl_tree
-            st.session_state["last_simulation"] = result
-            st.session_state.pop("last_path", None)
-            st.session_state.pop("last_cost", None)
-            st.success("Simulation completed!")
+            with st.spinner("Solicitando simulación al backend..."):
+                try:
+                    response = requests.post("http://localhost:8002/run_simulation/", json={
+                        "num_nodes": num_nodos,
+                        "num_edges": num_aristas,
+                        "num_orders": num_ordenes
+                    })
+                    if response.ok:
+                        result = response.json()
+                        st.session_state["last_simulation"] = result
+                        st.success("Simulation completed via FastAPI!")
+                    else:
+                        st.error("❌ Error al ejecutar la simulación desde el backend.")
+                except Exception as e:
+                    st.error(f"❌ No se pudo conectar con FastAPI: {e}")
 
     
     with tabs[1]:

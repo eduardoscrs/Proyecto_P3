@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import networkx as nx
 from Proyect.sim.simulation import run_simulation_dynamic, dijkstra_shortest_path
+from Proyect.sim.serialize_utils import serialize_simulation_result
 
 # Importar el router con todos los endpoints RESTful
 from Proyect.Api.controllers import router as api_router
@@ -26,7 +27,7 @@ class RouteRequest(BaseModel):
 @app.post("/run_simulation/")
 async def run_simulation(params: SimulationParams):
     result = run_simulation_dynamic(params.num_nodes, params.num_edges, params.num_orders)
-    return result
+    return serialize_simulation_result(result)
 
 @app.post("/get_route/")
 async def get_route(request: RouteRequest):
