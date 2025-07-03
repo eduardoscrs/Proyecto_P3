@@ -343,9 +343,18 @@ def main():
         else:
             avl_tree = st.session_state["last_simulation"]["route_avl"]
             st.subheader("🌿 Rutas Frecuentes (AVL In-Order)")
-            # Mostrar las rutas más frecuentes desde la lista serializada
-            for i, (ruta, freq) in enumerate(avl_tree[:10], 1):
-                st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
+            if not avl_tree or len(avl_tree) == 0:
+                st.info("No frequent routes recorded yet.")
+            else:
+                # Mostrar las rutas más frecuentes desde la lista serializada
+                for i, (ruta, freq) in enumerate(avl_tree[:10], 1):
+                    st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
+                # Bar chart de rutas frecuentes
+                rutas = [ruta for ruta, _ in avl_tree[:10]]
+                freqs = [freq for _, freq in avl_tree[:10]]
+                if rutas:
+                    df_routes = pd.DataFrame({'Route': rutas, 'Frequency': freqs})
+                    st.bar_chart(df_routes.set_index('Route'))
             st.subheader("🌳 AVL Visual (Rutas)")
             # Visualización del árbol AVL solo si es un objeto AVLTree
             if hasattr(avl_tree, "root"):
