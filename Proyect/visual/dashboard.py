@@ -11,6 +11,7 @@ from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
 from Proyect.model.graph_utils import dijkstra, reconstruct_path
 from streamlit_folium import st_folium
+from Proyect.visual.report_generator import generate_pdf_report
 
 def start_simulation(num_nodes, num_edges, num_orders):
     url = "http://localhost:8002/run_simulation/"
@@ -366,4 +367,3 @@ def main():
 
         else:
             st.warning("You need to run a simulation first.")
-# NOTE: If you want to use Vertex objects as dict keys, ensure Vertex implements __hash__ and __eq__ based on .element().
