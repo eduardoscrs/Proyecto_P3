@@ -203,7 +203,17 @@ def main():
                 for n, (lat, lon) in node_coords.items():
                     tipo = nx_graph.nodes[n].get("tipo", "")
                     color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
-                    folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=f"{n} ({tipo})").add_to(m)
+                    icon = None
+                    if tipo == "almacenamiento":
+                        icon = folium.DivIcon(html=f'<div style="font-size:24px;">📦</div>')
+                    elif tipo == "recarga":
+                        icon = folium.DivIcon(html=f'<div style="font-size:24px;">🔋</div>')
+                    elif tipo == "cliente":
+                        icon = folium.DivIcon(html=f'<div style="font-size:24px;">👤</div>')
+                    if icon:
+                        folium.Marker([lat, lon], icon=icon, popup=f"{n} ({tipo})").add_to(m)
+                    else:
+                        folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=f"{n} ({tipo})").add_to(m)
                 for u, v, d in nx_graph.edges(data=True):
                     latlngs = [node_coords[u], node_coords[v]]
                     folium.PolyLine(latlngs, color="#888", weight=2, opacity=0.5, tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
