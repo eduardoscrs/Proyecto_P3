@@ -21,10 +21,10 @@ def dijkstra(graph, start_vertex):
     prev = {v: None for v in graph.vertices()}
     dist[start_vertex] = 0
 
-    heap = [(0, start_vertex)]
+    heap = [(0, start_vertex.element(), start_vertex)]  # usar .element() como desempate
 
     while heap:
-        current_dist, current_vertex = heapq.heappop(heap)
+        current_dist, _, current_vertex = heapq.heappop(heap)
 
         if current_dist > dist[current_vertex]:
             continue
@@ -37,9 +37,10 @@ def dijkstra(graph, start_vertex):
             if distance < dist[neighbor]:
                 dist[neighbor] = distance
                 prev[neighbor] = current_vertex
-                heapq.heappush(heap, (distance, neighbor))
+                heapq.heappush(heap, (distance, neighbor.element(), neighbor))  # corregido
 
     return dist, prev
+
 
 def reconstruct_path(prev, start, end):
     path = []
