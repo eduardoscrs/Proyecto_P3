@@ -11,6 +11,7 @@ from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
 from Proyect.model.graph_utils import dijkstra, reconstruct_path
 from streamlit_folium import st_folium
+from Proyect.visual.report_generator import generate_pdf_report
 
 def start_simulation(num_nodes, num_edges, num_orders):
     url = "http://localhost:8002/run_simulation/"
@@ -79,6 +80,47 @@ def draw_network(nx_graph, path=None):
     plt.legend(handles=legend_elements, loc="lower left", fontsize=font_size + 1)
     st.pyplot(plt.gcf())
 
+# --- NUEVO: Battery-aware Dijkstra ---
+def battery_aware_dijkstra(graph, origin_v, destination_v, recharge_nodes, autonomy=50):
+    """
+    Dijkstra que fuerza recarga si la distancia entre nodos supera la autonomía.
+    Retorna (path, total_cost) o (None, None) si no hay ruta.
+    """
+    path = []
+    total_cost = 0
+    current = origin_v
+    while True:
+        distances, prev = dijkstra(graph, current)
+        # Buscar si se puede llegar directo
+        if distances.get(destination_v, float('inf')) <= autonomy:
+            sub_path = reconstruct_path(prev, current, destination_v)
+            if not sub_path:
+                return None, None
+            path += sub_path[1:] if path else sub_path
+            total_cost += distances[destination_v]
+            break
+        # Buscar estación de recarga alcanzable más cercana al destino
+        min_cost = float('inf')
+        next_recharge = None
+        best_subpath = None
+        for r in recharge_nodes:
+            v_r = graph.get_vertex(r)
+            if v_r == current:
+                continue
+            if distances.get(v_r, float('inf')) <= autonomy:
+                # Desde esta estación, ¿puedo llegar al destino?
+                d2, _ = dijkstra(graph, v_r)
+                if d2.get(destination_v, float('inf')) < min_cost:
+                    min_cost = d2[destination_v]
+                    next_recharge = v_r
+                    best_subpath = reconstruct_path(prev, current, v_r)
+        if not next_recharge or not best_subpath:
+            return None, None
+        path += best_subpath[1:] if path else best_subpath
+        total_cost += distances[next_recharge]
+        current = next_recharge
+    return path, total_cost
+
 # ---------- MAIN APP ----------
 def main():
     st.title("🚁 Drone Logistics Simulator - Correos Chile")
@@ -125,9 +167,11 @@ def main():
             st.session_state.pop("last_cost", None)
             st.success("Simulation completed!")
 
-    # 2. Explore Network
+    
     with tabs[1]:
-        st.header("🌍 Network Visualization (Folium)")
+        st.header("🌍 Network Visualization on Real Map")
+        st.markdown("📍 **Full Network on Map**")
+
         if "last_simulation" not in st.session_state:
             st.warning("Initialize a simulation first.")
         else:
@@ -136,72 +180,99 @@ def main():
             graph = sim_data["graph"]
             storage_nodes = sim_data["storage_nodes"]
             client_nodes = sim_data["client_nodes"]
+            recharge_nodes = sim_data["recharge_nodes"]
             node_options_storage = storage_nodes
             node_options_client = client_nodes
 
-            # Dummy geolocations for demo (replace with real if available)
             import random
             random.seed(42)
-            node_coords = {n: (random.uniform(-33.5, -33.3), random.uniform(-70.7, -70.5)) for n in nx_graph.nodes}
+            node_coords = {n: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in nx_graph.nodes}
 
-            col1, col2 = st.columns([0.35, 0.65])
+            col1, col2 = st.columns([0.65, 0.35])
+
             with col1:
-                st.subheader("Select Route")
-                origen = st.selectbox("Origin Node (Storage)", node_options_storage)
-                destino = st.selectbox("Destination Node (Client)", node_options_client)
-                algoritmo = st.radio("Algorithm", ["Dijkstra"], index=0)
-                calcular = st.button("✈️ Calculate Route")
-                show_dijkstra = st.button("🧭 Show Dijkstra Route")
-                show_mst = st.button("🌲 Show MST (Kruskal)")
-                complete_delivery = st.button("✅ Complete Delivery and Create Order")
+                m = folium.Map(location=[-12.045, -77.03], zoom_start=14)
 
-            with col2:
-                st.subheader("Geographical Map (Folium)")
-                # Inicializar mapa centrado
-                m = folium.Map(location=[-33.4, -70.6], zoom_start=12)
-                # Dibujar nodos
                 for n, (lat, lon) in node_coords.items():
                     tipo = nx_graph.nodes[n].get("tipo", "")
                     color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
-                    folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=n).add_to(m)
-                # Dibujar aristas
-                for u, v, d in nx_graph.edges(data=True):
-                    latlngs = [node_coords[u], node_coords[v]]
-                    folium.PolyLine(latlngs, color="#888", weight=2, opacity=0.5, tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
-                # --- NUEVO: Cálculo y visualización separados ---
-                if calcular:
-                    # Calcular ruta con Dijkstra y guardar en sesión, pero NO pintar
-                    origin_v = graph.get_vertex(origen)
-                    destination_v = graph.get_vertex(destino)
-                    from Proyect.model.graph_utils import dijkstra, reconstruct_path
-                    distances, prev = dijkstra(graph, origin_v)
-                    path = reconstruct_path(prev, origin_v, destination_v)
-                    if path:
-                        route_path = [v.element() for v in path]
-                        st.session_state["last_path"] = route_path
-                        st.session_state["last_cost"] = distances[destination_v]
-                        st.success(f"Path: {' → '.join(route_path)} | Cost: {distances[destination_v]}")
+                    icon = None
+                    if tipo == "almacenamiento":
+                        icon = folium.DivIcon(html=f'<div style="font-size:24px;">📦</div>')
+                    elif tipo == "recarga":
+                        icon = folium.DivIcon(html=f'<div style="font-size:24px;">🔋</div>')
+                    elif tipo == "cliente":
+                        icon = folium.DivIcon(html=f'<div style="font-size:24px;">👤</div>')
+                    popup_text = f"{n} ({tipo})"
+                    connected = []
+                    for u, v, d in nx_graph.edges(data=True):
+                        if u == n or v == n:
+                            other = v if u == n else u
+                            connected.append(f"{other}: {d.get('weight','')}")
+                    if connected:
+                        popup_text += '<br>Peso(s):<br>' + '<br>'.join(connected)
+                    if icon:
+                        folium.Marker([lat, lon], icon=icon, popup=popup_text).add_to(m)
                     else:
-                        st.session_state["last_path"] = None
-                        st.session_state["last_cost"] = None
-                        st.error("❌ No path found.")
-                # Mostrar ruta solo si se presiona el botón de Dijkstra
-                route_path = st.session_state.get("last_path", None)
-                if show_dijkstra:
-                    # Al presionar, borra la ruta anterior y pinta la nueva
-                    if route_path and len(route_path) > 1:
-                        for i in range(len(route_path)-1):
-                            u, v = route_path[i], route_path[i+1]
-                            folium.PolyLine([node_coords[u], node_coords[v]], color="red", weight=5, opacity=0.9).add_to(m)
-                # Mostrar mapa
-                st_folium(m, width=700, height=500)
-                # Resumen de vuelo
-                if route_path:
-                    st.info(f"Resumen de vuelo: Ruta {' → '.join(route_path)}, Distancia: {st.session_state.get('last_cost', '-')}")
-                else:
-                    st.info("Resumen de vuelo: No hay ruta seleccionada.")
+                        folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=popup_text).add_to(m)
 
-    # 3. Clients & Orders
+                for u, v, d in nx_graph.edges(data=True):
+                    folium.PolyLine([node_coords[u], node_coords[v]], color="#888", weight=2, opacity=0.5,
+                                    tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
+
+                route_path = st.session_state.get("last_path", None)
+                if route_path:
+                    for i in range(len(route_path) - 1):
+                        u, v_ = route_path[i], route_path[i + 1]
+                        folium.PolyLine([node_coords[u], node_coords[v_]], color="red", weight=5, opacity=0.9).add_to(m)
+
+                if st.session_state.get("show_mst", False):
+                    from Proyect.model.graph_utils import kruskal_mst
+                    mst_edges = kruskal_mst(graph)
+                    for u, v in mst_edges:
+                        folium.PolyLine([node_coords[u], node_coords[v]], color="#00ff00", weight=4, opacity=0.7, dash_array='10,10').add_to(m)
+
+                st_folium(m, width=750, height=520)
+
+            with col2:
+                st.subheader("🧮 Calculate Route")
+                origen = st.selectbox("Origin Node (Storage Only)", node_options_storage)
+                destino = st.selectbox("Destination Node (Client Only)", node_options_client)
+                st.markdown("Using algorithm: **Dijkstra with battery constraint**")
+
+                calcular = st.button("✈️ Calculate Route")
+                show_mst = st.button("🌲 Show MST (Kruskal)")
+
+                if calcular:
+                    if origen not in storage_nodes or destino not in client_nodes:
+                        st.error("Only routes from Storage to Client are allowed.")
+                    else:
+                        origin_v = graph.get_vertex(origen)
+                        destination_v = graph.get_vertex(destino)
+                        path, cost = battery_aware_dijkstra(graph, origin_v, destination_v, recharge_nodes, autonomy=50)
+                        if path:
+                            path_names = [v.element() if hasattr(v, 'element') else v for v in path]
+                            st.session_state["last_path"] = path_names
+                            st.session_state["last_cost"] = cost
+                            st.session_state["show_mst"] = False
+                            st.success(f"Route: {' → '.join(path_names)} | Distance: {cost}")
+                        else:
+                            st.session_state["last_path"] = None
+                            st.session_state["last_cost"] = None
+                            st.error("No valid route found within drone autonomy.")
+
+                if show_mst:
+                    st.session_state["show_mst"] = True
+
+                st.markdown("---")
+                st.markdown("### 🧭 Node Types:")
+                st.markdown(f"- 📦 **Storage Nodes**: {len(storage_nodes)}")
+                st.markdown(f"- 🔋 **Recharge Nodes**: {len(recharge_nodes)}")
+                st.markdown(f"- 👤 **Client Nodes**: {len(client_nodes)}")
+
+                if st.session_state.get("last_path"):
+                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: `{st.session_state['last_cost']}`")
+# 3. Clients & Orders
     with tabs[2]:
         st.header("🌐 Clients and Orders")
         if "last_simulation" in st.session_state:
@@ -248,6 +319,18 @@ def main():
                 st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
             st.subheader("🌳 AVL Visual (Rutas)")
             draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
+
+            # 🔽 Botón para generar PDF
+            if st.button("📄 Generar Informe PDF"):
+                sim_data = st.session_state["last_simulation"]
+                pdf_bytes = generate_pdf_report(sim_data, avl_tree)
+
+                st.download_button(
+                    label="⬇️ Descargar Informe PDF",
+                    data=pdf_bytes,
+                    file_name="reporte_logistico.pdf",
+                    mime="application/pdf"
+                )
 
 
     # 5. Statistics
