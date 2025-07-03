@@ -184,7 +184,8 @@ def main():
             # Dummy geolocations for demo (replace with real if available)
             import random
             random.seed(42)
-            node_coords = {n: (random.uniform(-33.5, -33.3), random.uniform(-70.7, -70.5)) for n in nx_graph.nodes}
+            # Centered near Lima, Peru
+            node_coords = {n: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in nx_graph.nodes}
 
             col1, col2 = st.columns([0.35, 0.65])
             with col1:
@@ -197,7 +198,8 @@ def main():
                 show_mst = st.button("🌲 Show MST (Kruskal)")
             with col2:
                 st.subheader("Geographical Map (Folium)")
-                m = folium.Map(location=[-33.4, -70.6], zoom_start=12)
+                # Cambiar centro del mapa a Lima, Perú
+                m = folium.Map(location=[-12.04318, -77.02824], zoom_start=13)
                 for n, (lat, lon) in node_coords.items():
                     tipo = nx_graph.nodes[n].get("tipo", "")
                     color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
