@@ -243,6 +243,7 @@ def main():
 
                 calcular = st.button("✈️ Calculate Route")
                 show_mst = st.button("🌲 Show MST (Kruskal)")
+                completar_orden = st.button("✅ Complete Delivery and Create Order")
 
                 if calcular:
                     if origen not in storage_nodes or destino not in client_nodes:
@@ -264,6 +265,13 @@ def main():
 
                 if show_mst:
                     st.session_state["show_mst"] = True
+
+                if completar_orden:
+                    if st.session_state.get("last_path") and st.session_state.get("last_cost") is not None:
+                        st.success(f"Order completed! Route: {' → '.join(st.session_state['last_path'])} | Distance: {st.session_state['last_cost']}")
+                        # Aquí puedes agregar lógica para registrar la orden en el backend si lo deseas
+                    else:
+                        st.warning("Calculate a valid route before completing the delivery.")
 
                 st.markdown("---")
                 st.markdown("### 🧭 Node Types:")
