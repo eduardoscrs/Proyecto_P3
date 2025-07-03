@@ -4,6 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
+import random
 import folium
 from matplotlib.patches import Patch
 from Proyect.sim.simulation import run_simulation_dynamic
@@ -184,8 +185,8 @@ def main():
             node_options_storage = storage_nodes
             node_options_client = client_nodes
 
-            import random
-            random.seed(42)
+            
+            random.seed(40)
             node_coords = {n: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in nx_graph.nodes}
 
             col1, col2 = st.columns([0.65, 0.35])
@@ -220,17 +221,29 @@ def main():
                     folium.PolyLine([node_coords[u], node_coords[v]], color="#888", weight=2, opacity=0.5,
                                     tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
 
+            
+
                 route_path = st.session_state.get("last_path", None)
                 if route_path:
                     for i in range(len(route_path) - 1):
-                        u, v_ = route_path[i], route_path[i + 1]
-                        folium.PolyLine([node_coords[u], node_coords[v_]], color="red", weight=5, opacity=0.9).add_to(m)
-
+                        u, v = route_path[i], route_path[i + 1]
+                        folium.PolyLine(
+                            [node_coords[u], node_coords[v]],
+                            color="red", weight=5, opacity=0.9
+                        ).add_to(m)
+                        
                 if st.session_state.get("show_mst", False):
                     from Proyect.model.graph_utils import kruskal_mst
                     mst_edges = kruskal_mst(graph)
                     for u, v in mst_edges:
-                        folium.PolyLine([node_coords[u], node_coords[v]], color="#00ff00", weight=4, opacity=0.7, dash_array='10,10').add_to(m)
+                        folium.PolyLine(
+                            [node_coords[u], node_coords[v]],
+                            color="#00ff00", weight=4, opacity=0.7, dash_array='10,10'
+                        ).add_to(m)
+
+                    # SOLO MOSTRAR LA RUTA SI show_mst ESTÁ ACTIVADO
+                    
+
 
                 st_folium(m, width=750, height=520)
 
@@ -242,7 +255,16 @@ def main():
 
                 calcular = st.button("✈️ Calculate Route")
                 show_mst = st.button("🌲 Show MST (Kruskal)")
+                hide_mst = st.button("❌ Ocultar MST (Kruskal)")
 
+                if show_mst:
+                    st.session_state["show_mst"] = True
+                if hide_mst:
+                    st.session_state["show_mst"] = False
+                if st.session_state.get("last_path"):
+                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: `{st.session_state['last_cost']}`")
+
+                
                 if calcular:
                     if origen not in storage_nodes or destino not in client_nodes:
                         st.error("Only routes from Storage to Client are allowed.")
@@ -270,8 +292,7 @@ def main():
                 st.markdown(f"- 🔋 **Recharge Nodes**: {len(recharge_nodes)}")
                 st.markdown(f"- 👤 **Client Nodes**: {len(client_nodes)}")
 
-                if st.session_state.get("last_path"):
-                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: `{st.session_state['last_cost']}`")
+                
 # 3. Clients & Orders
     with tabs[2]:
         st.header("🌐 Clients and Orders")
