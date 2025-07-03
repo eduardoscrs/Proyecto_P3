@@ -1,6 +1,5 @@
 import streamlit as st
 st.set_page_config(page_title="Drone Logistics Simulator", layout="wide")  # ¡Debe ir primero!
-import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
@@ -12,6 +11,8 @@ from Proyect.tda.avl import AVLTree
 from Proyect.model.graph_utils import dijkstra, reconstruct_path
 from streamlit_folium import st_folium
 from Proyect.visual.report_generator import generate_pdf_report
+from Proyect.model.graph  import build_internal_graph
+
 
 def start_simulation(num_nodes, num_edges, num_orders):
     url = "http://localhost:8002/run_simulation/"
@@ -177,8 +178,22 @@ def main():
             st.warning("Initialize a simulation first.")
         else:
             sim_data = st.session_state["last_simulation"]
-            nx_graph = sim_data["nx_graph"]
-            graph = sim_data["graph"]
+            # Extraer la lista de aristas y nodos serializadas solo si no existe ya
+            if "edge_list" not in sim_data:
+                edge_list = sim_data["nx_graph"]["edges"]
+                sim_data["edge_list"] = edge_list
+            else:
+                edge_list = sim_data["edge_list"]
+            if "node_list" not in sim_data:
+                node_list = sim_data["nx_graph"]["nodes"]
+                sim_data["node_list"] = node_list
+            else:
+                node_list = sim_data["node_list"]
+
+            # Ya no usamos networkx
+            from Proyect.model.graph import build_internal_graph
+            graph = build_internal_graph(edge_list)
+            sim_data["graph"] = graph
             storage_nodes = sim_data["storage_nodes"]
             client_nodes = sim_data["client_nodes"]
             recharge_nodes = sim_data["recharge_nodes"]
@@ -187,15 +202,16 @@ def main():
 
             import random
             random.seed(42)
-            node_coords = {n: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in nx_graph.nodes}
+            node_coords = {n["id"]: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in node_list}
 
             col1, col2 = st.columns([0.65, 0.35])
 
             with col1:
                 m = folium.Map(location=[-12.045, -77.03], zoom_start=14)
 
-                for n, (lat, lon) in node_coords.items():
-                    tipo = nx_graph.nodes[n].get("tipo", "")
+                for node in node_list:
+                    n = node["id"]
+                    tipo = node.get("tipo", "")
                     color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
                     icon = None
                     if tipo == "almacenamiento":
@@ -206,20 +222,22 @@ def main():
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">👤</div>')
                     popup_text = f"{n} ({tipo})"
                     connected = []
-                    for u, v, d in nx_graph.edges(data=True):
-                        if u == n or v == n:
-                            other = v if u == n else u
-                            connected.append(f"{other}: {d.get('weight','')}")
+                    for edge in edge_list:
+                        if edge["source"] == n or edge["target"] == n:
+                            other = edge["target"] if edge["source"] == n else edge["source"]
+                            connected.append(f"{other}: {edge.get('weight','')}")
                     if connected:
                         popup_text += '<br>Peso(s):<br>' + '<br>'.join(connected)
                     if icon:
-                        folium.Marker([lat, lon], icon=icon, popup=popup_text).add_to(m)
+                        folium.Marker([node_coords[n][0], node_coords[n][1]], icon=icon, popup=popup_text).add_to(m)
                     else:
-                        folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=popup_text).add_to(m)
+                        folium.CircleMarker([node_coords[n][0], node_coords[n][1]], radius=7, color=color, fill=True, fill_opacity=0.8, popup=popup_text).add_to(m)
 
-                for u, v, d in nx_graph.edges(data=True):
+                for edge in edge_list:
+                    u = edge["source"]
+                    v = edge["target"]
                     folium.PolyLine([node_coords[u], node_coords[v]], color="#888", weight=2, opacity=0.5,
-                                    tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
+                                    tooltip=f"{u}→{v} ({edge.get('weight', '')})").add_to(m)
 
                 route_path = st.session_state.get("last_path", None)
                 if route_path:
@@ -287,12 +305,12 @@ def main():
         if "last_simulation" in st.session_state:
             clientes = st.session_state["last_simulation"]["clientes"]
             orders_map = st.session_state["last_simulation"]["orders_map"]
-            clientes_data = [v.to_dict() for _, v in clientes.items()]
+            clientes_data = list(clientes.values())
             st.subheader("Clients (from hash map)")
             st.json(clientes_data)
 
             orders = st.session_state["last_simulation"]["orders"]
-            orders_data = [o.to_dict() for o in orders]
+            orders_data = orders
             st.subheader("Orders (from list)")
             st.json(orders_data)
 
@@ -305,7 +323,8 @@ def main():
                 if client_id:
                     client_obj = clientes.get(client_id)
                     if client_obj:
-                        st.success(f"Cliente encontrado: {client_obj.to_dict()}")
+                        st.success("Cliente encontrado:")
+                        st.json(client_obj)
                     else:
                         st.warning("Cliente no encontrado en el hash map.")
             with col2:
@@ -324,10 +343,15 @@ def main():
         else:
             avl_tree = st.session_state["last_simulation"]["route_avl"]
             st.subheader("🌿 Rutas Frecuentes (AVL In-Order)")
-            for i, (ruta, freq) in enumerate(avl_tree.get_top_routes(10), 1):
+            # Mostrar las rutas más frecuentes desde la lista serializada
+            for i, (ruta, freq) in enumerate(avl_tree[:10], 1):
                 st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
             st.subheader("🌳 AVL Visual (Rutas)")
-            draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
+            # Visualización del árbol AVL solo si es un objeto AVLTree
+            if hasattr(avl_tree, "root"):
+                draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
+            else:
+                st.info("AVL tree structure visualization is not available for serialized data.")
 
             # 🔽 Botón para generar PDF
             if st.button("📄 Generar Informe PDF"):
@@ -364,14 +388,15 @@ def main():
             # Bar Chart - Most Visited Recharge Stations
             with col2:
                 st.subheader("Most Visited Recharge Stations")
-                most_visited_recharge = {node: sim["nx_graph"].degree(node) for node in sim["recharge_nodes"]}
+                edge_list = sim["edge_list"]
+                most_visited_recharge = {node: sum(1 for e in edge_list if e["source"] == node or e["target"] == node) for node in sim["recharge_nodes"]}
                 recharge_data = pd.DataFrame(list(most_visited_recharge.items()), columns=['Station', 'Visits'])
                 st.bar_chart(recharge_data.set_index('Station'))
 
             # Bar Chart - Most Visited Storage Nodes
             with col3:
                 st.subheader("Most Visited Storage Nodes")
-                most_visited_storage = {node: sim["nx_graph"].degree(node) for node in sim["storage_nodes"]}
+                most_visited_storage = {node: sum(1 for e in edge_list if e["source"] == node or e["target"] == node) for node in sim["storage_nodes"]}
                 storage_data = pd.DataFrame(list(most_visited_storage.items()), columns=['Storage Node', 'Visits'])
                 st.bar_chart(storage_data.set_index('Storage Node'))
 
