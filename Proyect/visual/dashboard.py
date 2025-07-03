@@ -206,6 +206,7 @@ def main():
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">👤</div>')
                     popup_text = f"{n} ({tipo})"
                     connected = []
+                    
                     for u, v, d in nx_graph.edges(data=True):
                         if u == n or v == n:
                             other = v if u == n else u
@@ -231,7 +232,7 @@ def main():
                             [node_coords[u], node_coords[v]],
                             color="red", weight=5, opacity=0.9
                         ).add_to(m)
-                        
+
                 if st.session_state.get("show_mst", False):
                     from Proyect.model.graph_utils import kruskal_mst
                     mst_edges = kruskal_mst(graph)
@@ -240,11 +241,7 @@ def main():
                             [node_coords[u], node_coords[v]],
                             color="#00ff00", weight=4, opacity=0.7, dash_array='10,10'
                         ).add_to(m)
-
-                    # SOLO MOSTRAR LA RUTA SI show_mst ESTÁ ACTIVADO
                     
-
-
                 st_folium(m, width=750, height=520)
 
             with col2:
