@@ -320,6 +320,18 @@ def main():
             st.subheader("🌳 AVL Visual (Rutas)")
             draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
 
+            # 🔽 Botón para generar PDF
+            if st.button("📄 Generar Informe PDF"):
+                sim_data = st.session_state["last_simulation"]
+                pdf_bytes = generate_pdf_report(sim_data, avl_tree)
+
+                st.download_button(
+                    label="⬇️ Descargar Informe PDF",
+                    data=pdf_bytes,
+                    file_name="reporte_logistico.pdf",
+                    mime="application/pdf"
+                )
+
 
     # 5. Statistics
     with tabs[4]:
