@@ -1,8 +1,10 @@
 import streamlit as st
 st.set_page_config(page_title="Drone Logistics Simulator", layout="wide")  # ¡Debe ir primero!
+import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
+import random
 import folium
 from matplotlib.patches import Patch
 from Proyect.sim.simulation import run_simulation_dynamic
@@ -10,11 +12,8 @@ from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
 from Proyect.model.graph_utils import dijkstra, reconstruct_path
 from streamlit_folium import st_folium
+from Proyect.domain.order import Order
 from Proyect.visual.report_generator import generate_pdf_report
-from Proyect.model.graph  import build_internal_graph
-import networkx as nx
-
-
 
 def start_simulation(num_nodes, num_edges, num_orders):
     url = "http://localhost:8002/run_simulation/"
@@ -155,21 +154,20 @@ def main():
         """)
 
         if st.button("🟢 Start Simulation"):
-            with st.spinner("Solicitando simulación al backend..."):
-                try:
-                    response = requests.post("http://localhost:8002/run_simulation/", json={
-                        "num_nodes": num_nodos,
-                        "num_edges": num_aristas,
-                        "num_orders": num_ordenes
-                    })
-                    if response.ok:
-                        result = response.json()
-                        st.session_state["last_simulation"] = result
-                        st.success("Simulation completed via FastAPI!")
-                    else:
-                        st.error("❌ Error al ejecutar la simulación desde el backend.")
-                except Exception as e:
-                    st.error(f"❌ No se pudo conectar con FastAPI: {e}")
+            result = run_simulation_dynamic(num_nodos, num_aristas, num_ordenes)
+            avl_tree = AVLTree()
+            try:
+                for order in result["orders"]:
+                    path = nx.shortest_path(result["nx_graph"], order.origin, order.destination, weight="weight")
+                    route_str = " → ".join(path)
+                    avl_tree.insert(route_str)
+            except:
+                pass
+            result["route_avl"] = avl_tree
+            st.session_state["last_simulation"] = result
+            st.session_state.pop("last_path", None)
+            st.session_state.pop("last_cost", None)
+            st.success("Simulation completed!")
 
     
     with tabs[1]:
@@ -180,80 +178,85 @@ def main():
             st.warning("Initialize a simulation first.")
         else:
             sim_data = st.session_state["last_simulation"]
-            # Extraer la lista de aristas y nodos serializadas solo si no existe ya
-            if "edge_list" not in sim_data:
-                edge_list = sim_data["nx_graph"]["edges"]
-                sim_data["edge_list"] = edge_list
-            else:
-                edge_list = sim_data["edge_list"]
-            if "node_list" not in sim_data:
-                node_list = sim_data["nx_graph"]["nodes"]
-                sim_data["node_list"] = node_list
-            else:
-                node_list = sim_data["node_list"]
-
-            # Ya no usamos networkx
-            from Proyect.model.graph import build_internal_graph
-            graph = build_internal_graph(edge_list)
-            sim_data["graph"] = graph
+            nx_graph = sim_data["nx_graph"]
+            graph = sim_data["graph"]
             storage_nodes = sim_data["storage_nodes"]
             client_nodes = sim_data["client_nodes"]
             recharge_nodes = sim_data["recharge_nodes"]
             node_options_storage = storage_nodes
             node_options_client = client_nodes
 
-            import random
-            random.seed(42)
-            node_coords = {n["id"]: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in node_list}
+            
+            random.seed(100)
+            node_coords = {n: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in nx_graph.nodes}
 
             col1, col2 = st.columns([0.65, 0.35])
 
             with col1:
                 m = folium.Map(location=[-12.045, -77.03], zoom_start=14)
 
-                for node in node_list:
-                    n = node["id"]
-                    tipo = node.get("tipo", "")
+                for n, (lat, lon) in node_coords.items():
+                    tipo = nx_graph.nodes[n].get("tipo", "")
                     color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
-                    icon = None
+                    
+
                     if tipo == "almacenamiento":
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">📦</div>')
                     elif tipo == "recarga":
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">🔋</div>')
                     elif tipo == "cliente":
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">👤</div>')
+
                     popup_text = f"{n} ({tipo})"
+
                     connected = []
-                    for edge in edge_list:
-                        if edge["source"] == n or edge["target"] == n:
-                            other = edge["target"] if edge["source"] == n else edge["source"]
-                            connected.append(f"{other}: {edge.get('weight','')}")
+
+                    for u, v, d in nx_graph.edges(data=True):
+                        if u == n or v == n:
+                            other = v if u == n else u
+                            connected.append(f"{other}: {d.get('weight','')}")
+
                     if connected:
                         popup_text += '<br>Peso(s):<br>' + '<br>'.join(connected)
-                    if icon:
-                        folium.Marker([node_coords[n][0], node_coords[n][1]], icon=icon, popup=popup_text).add_to(m)
-                    else:
-                        folium.CircleMarker([node_coords[n][0], node_coords[n][1]], radius=7, color=color, fill=True, fill_opacity=0.8, popup=popup_text).add_to(m)
 
-                for edge in edge_list:
-                    u = edge["source"]
-                    v = edge["target"]
+                    tooltip_text = f"{n} ({tipo})"
+                    if icon:
+                         folium.Marker([lat, lon], icon=icon, popup=popup_text, tooltip=tooltip_text).add_to(m)
+                    else:
+                        folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=popup_text).add_to(m)
+
+                for u, v, d in nx_graph.edges(data=True):
                     folium.PolyLine([node_coords[u], node_coords[v]], color="#888", weight=2, opacity=0.5,
-                                    tooltip=f"{u}→{v} ({edge.get('weight', '')})").add_to(m)
+                                    tooltip=f"{u}→{v} ({d.get('weight', '')})").add_to(m)
+
+            
 
                 route_path = st.session_state.get("last_path", None)
                 if route_path:
                     for i in range(len(route_path) - 1):
-                        u, v_ = route_path[i], route_path[i + 1]
-                        folium.PolyLine([node_coords[u], node_coords[v_]], color="red", weight=5, opacity=0.9).add_to(m)
+                        u, v = route_path[i], route_path[i + 1]
+                        folium.PolyLine(
+                            [node_coords[u], node_coords[v]],
+                            color="red", weight=5, opacity=0.9
+                        ).add_to(m)
 
+                # Mostrar el MST si se presionó el botón
                 if st.session_state.get("show_mst", False):
                     from Proyect.model.graph_utils import kruskal_mst
                     mst_edges = kruskal_mst(graph)
                     for u, v in mst_edges:
-                        folium.PolyLine([node_coords[u], node_coords[v]], color="#00ff00", weight=4, opacity=0.7, dash_array='10,10').add_to(m)
-
+                        folium.PolyLine(
+                            [node_coords[u], node_coords[v]],
+                            color="#1100ff", weight=4, opacity=0.7, dash_array='10,10'
+                        ).add_to(m)
+                    
                 st_folium(m, width=750, height=520)
+
+                st.markdown("---")
+                st.markdown("### 🧭 Node Types:")
+                st.markdown(f"- 📦 **Storage Nodes**: {len(storage_nodes)}")
+                st.markdown(f"- 🔋 **Recharge Nodes**: {len(recharge_nodes)}")
+                st.markdown(f"- 👤 **Client Nodes**: {len(client_nodes)}")
 
             with col2:
                 st.subheader("🧮 Calculate Route")
@@ -263,7 +266,24 @@ def main():
 
                 calcular = st.button("✈️ Calculate Route")
                 show_mst = st.button("🌲 Show MST (Kruskal)")
-                completar_orden = st.button("✅ Complete Delivery and Create Order")
+                hide_mst = st.button("❌ Ocultar MST (Kruskal)")
+                complete_order = st.button("completar orden")
+
+                if complete_order and st.session_state.get("last_path"):
+                    # Verificamos si hay una orden asociada a la simulación
+                    orders = st.session_state["last_simulation"]["orders"]
+                    order_obj = None  
+
+                    for order in orders:
+                        if order.origin == origen and order.destination == destino and order.status != "delivered":
+                            order_obj = order
+                            break
+                    if order_obj:
+                        route_cost = st.session_state['last_cost']  # Usamos el costo de la ruta calculada
+                        order_obj.complete(route_cost)
+                        st.success(f"¡La orden {order_obj.order_id} ha sido marcada como entregada!")
+                    else:
+                        st.warning("No se encontró una orden coincidente o ya está entregada.")
 
                 if calcular:
                     if origen not in storage_nodes or destino not in client_nodes:
@@ -285,34 +305,26 @@ def main():
 
                 if show_mst:
                     st.session_state["show_mst"] = True
-
-                if completar_orden:
-                    if st.session_state.get("last_path") and st.session_state.get("last_cost") is not None:
-                        st.success(f"Order completed! Route: {' → '.join(st.session_state['last_path'])} | Distance: {st.session_state['last_cost']}")
-                        # Aquí puedes agregar lógica para registrar la orden en el backend si lo deseas
-                    else:
-                        st.warning("Calculate a valid route before completing the delivery.")
-
-                st.markdown("---")
-                st.markdown("### 🧭 Node Types:")
-                st.markdown(f"- 📦 **Storage Nodes**: {len(storage_nodes)}")
-                st.markdown(f"- 🔋 **Recharge Nodes**: {len(recharge_nodes)}")
-                st.markdown(f"- 👤 **Client Nodes**: {len(client_nodes)}")
+                if hide_mst:
+                    st.session_state["show_mst"] = False
 
                 if st.session_state.get("last_path"):
-                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: `{st.session_state['last_cost']}`")
+                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: {st.session_state['last_cost']}")
+
+
 # 3. Clients & Orders
     with tabs[2]:
         st.header("🌐 Clients and Orders")
         if "last_simulation" in st.session_state:
             clientes = st.session_state["last_simulation"]["clientes"]
             orders_map = st.session_state["last_simulation"]["orders_map"]
-            clientes_data = list(clientes.values())
+            clientes_data = [v.to_dict() for _, v in clientes.items()]
             st.subheader("Clients (from hash map)")
             st.json(clientes_data)
 
+            clientes = st.session_state["last_simulation"]["clientes"]
             orders = st.session_state["last_simulation"]["orders"]
-            orders_data = orders
+            orders_data = [o.to_dict() for o in orders]
             st.subheader("Orders (from list)")
             st.json(orders_data)
 
@@ -325,8 +337,7 @@ def main():
                 if client_id:
                     client_obj = clientes.get(client_id)
                     if client_obj:
-                        st.success("Cliente encontrado:")
-                        st.json(client_obj)
+                        st.success(f"Cliente encontrado: {client_obj.to_dict()}")
                     else:
                         st.warning("Cliente no encontrado en el hash map.")
             with col2:
@@ -345,24 +356,10 @@ def main():
         else:
             avl_tree = st.session_state["last_simulation"]["route_avl"]
             st.subheader("🌿 Rutas Frecuentes (AVL In-Order)")
-            if not avl_tree or len(avl_tree) == 0:
-                st.info("No frequent routes recorded yet.")
-            else:
-                # Mostrar las rutas más frecuentes desde la lista serializada
-                for i, (ruta, freq) in enumerate(avl_tree[:10], 1):
-                    st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
-                # Bar chart de rutas frecuentes
-                rutas = [ruta for ruta, _ in avl_tree[:10]]
-                freqs = [freq for _, freq in avl_tree[:10]]
-                if rutas:
-                    df_routes = pd.DataFrame({'Route': rutas, 'Frequency': freqs})
-                    st.bar_chart(df_routes.set_index('Route'))
+            for i, (ruta, freq) in enumerate(avl_tree.get_top_routes(10), 1):
+                st.markdown(f"{i}. `{ruta}` → Freq: **{freq}**")
             st.subheader("🌳 AVL Visual (Rutas)")
-            # Visualización del árbol AVL solo si es un objeto AVLTree
-            if hasattr(avl_tree, "root"):
-                draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
-            else:
-                st.info("AVL tree structure visualization is not available for serialized data.")
+            draw_avl_tree(avl_tree, title="AVL Tree - Frequent Routes")
 
             # 🔽 Botón para generar PDF
             if st.button("📄 Generar Informe PDF"):
@@ -399,15 +396,14 @@ def main():
             # Bar Chart - Most Visited Recharge Stations
             with col2:
                 st.subheader("Most Visited Recharge Stations")
-                edge_list = sim["edge_list"]
-                most_visited_recharge = {node: sum(1 for e in edge_list if e["source"] == node or e["target"] == node) for node in sim["recharge_nodes"]}
+                most_visited_recharge = {node: sim["nx_graph"].degree(node) for node in sim["recharge_nodes"]}
                 recharge_data = pd.DataFrame(list(most_visited_recharge.items()), columns=['Station', 'Visits'])
                 st.bar_chart(recharge_data.set_index('Station'))
 
             # Bar Chart - Most Visited Storage Nodes
             with col3:
                 st.subheader("Most Visited Storage Nodes")
-                most_visited_storage = {node: sum(1 for e in edge_list if e["source"] == node or e["target"] == node) for node in sim["storage_nodes"]}
+                most_visited_storage = {node: sim["nx_graph"].degree(node) for node in sim["storage_nodes"]}
                 storage_data = pd.DataFrame(list(most_visited_storage.items()), columns=['Storage Node', 'Visits'])
                 st.bar_chart(storage_data.set_index('Storage Node'))
 
