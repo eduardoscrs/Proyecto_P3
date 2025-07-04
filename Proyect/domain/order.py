@@ -17,7 +17,7 @@ class Order:
         self.status = "delivered"
         self.delivered_at = datetime.now()
         self.route_cost = route_cost
-        
+
     def to_dict(self):
         return {
             "order_id": self.order_id,

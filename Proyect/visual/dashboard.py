@@ -12,6 +12,8 @@ from Proyect.model.graph_utils import dijkstra, reconstruct_path
 from streamlit_folium import st_folium
 from Proyect.visual.report_generator import generate_pdf_report
 from Proyect.model.graph  import build_internal_graph
+import networkx as nx
+
 
 
 def start_simulation(num_nodes, num_edges, num_orders):

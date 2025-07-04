@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 import networkx as nx
 from pydantic import BaseModel
 
-
 # Simulación
 from Proyect.sim.simulation import run_simulation_dynamic, dijkstra_shortest_path
 from Proyect.sim.serialize_utils import serialize_simulation_result
@@ -41,20 +40,27 @@ async def run_simulation(params: SimulationParams, db: Session = Depends(get_db)
 
     # Guardar CLIENTES
     for client_id, client_obj in result["clientes"].items():
-        db_client = Client(id=client_id, name=client_obj.nombre, total_orders=client_obj.total_orders)
+        # Usar 'name' en lugar de 'nombre' para acceder a los atributos correctos
+        db_client = Client(id=client_id, name=client_obj.name, total_orders=client_obj.total_orders)
         db.merge(db_client)
 
     # Guardar ÓRDENES con estado
+
+# Cambio en api.py
     for order in result["orders"]:
         status = "delivered" if getattr(order, "estado", "").lower() == "entregada" else "pending"
-        db_order = Order(id=order.id, origen=order.origen, destino=order.destino, status=status)
+        # Cambiar `order.order_id` a `order.id` para que coincida con el modelo de la base de datos
+        db_order = Order(id=order.order_id, origen=order.origin, destino=order.destination, status=status)
+
         db.merge(db_order)
+
+
 
     db.commit()
     return serialize_simulation_result(result)
 
 
-@app.post("/get_route/")
+@app.post("/get_route/")  # Endpoint para obtener una ruta
 async def get_route(request: RouteRequest, num_nodes: int = 15, num_edges: int = 20, num_orders: int = 10):
     sim = run_simulation_dynamic(num_nodes, num_edges, num_orders)  # Usar parámetros dinámicos
     nx_graph = sim["nx_graph"]
