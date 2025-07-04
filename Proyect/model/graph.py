@@ -96,3 +96,25 @@ class Graph:
             if v.element() == name:
                 return v
         return None
+
+
+def build_internal_graph(edge_list):
+    """
+    Construye un objeto Graph a partir de una lista de aristas serializadas.
+    edge_list: [{'source': u, 'target': v, 'weight': w}, ...]
+    """
+    from .graph import Graph
+    g = Graph(directed=True)
+    nodes = set()
+    for edge in edge_list:
+        nodes.add(edge['source'])
+        nodes.add(edge['target'])
+    # Insertar nodos
+    for n in nodes:
+        g.insert_vertex(n)
+    # Insertar aristas
+    for edge in edge_list:
+        u = g.get_vertex(edge['source'])
+        v = g.get_vertex(edge['target'])
+        g.insert_edge(u, v, edge.get('weight', 1))
+    return g
