@@ -252,6 +252,12 @@ def main():
                     
                 st_folium(m, width=750, height=520)
 
+                st.markdown("---")
+                st.markdown("### 🧭 Node Types:")
+                st.markdown(f"- 📦 **Storage Nodes**: {len(storage_nodes)}")
+                st.markdown(f"- 🔋 **Recharge Nodes**: {len(recharge_nodes)}")
+                st.markdown(f"- 👤 **Client Nodes**: {len(client_nodes)}")
+
             with col2:
                 st.subheader("🧮 Calculate Route")
                 origen = st.selectbox("Origin Node (Storage Only)", node_options_storage)
@@ -261,7 +267,23 @@ def main():
                 calcular = st.button("✈️ Calculate Route")
                 show_mst = st.button("🌲 Show MST (Kruskal)")
                 hide_mst = st.button("❌ Ocultar MST (Kruskal)")
+                complete_order = st.button("completar orden")
 
+                if complete_order and st.session_state.get("last_path"):
+                    # Verificamos si hay una orden asociada a la simulación
+                    orders = st.session_state["last_simulation"]["orders"]
+                    order_obj = None  
+
+                    for order in orders:
+                        if order.origin == origen and order.destination == destino and order.status != "delivered":
+                            order_obj = order
+                            break
+                    if order_obj:
+                        route_cost = st.session_state['last_cost']  # Usamos el costo de la ruta calculada
+                        order_obj.complete(route_cost)
+                        st.success(f"¡La orden {order_obj.order_id} ha sido marcada como entregada!")
+                    else:
+                        st.warning("No se encontró una orden coincidente o ya está entregada.")
 
                 if calcular:
                     if origen not in storage_nodes or destino not in client_nodes:
@@ -288,26 +310,8 @@ def main():
 
                 if st.session_state.get("last_path"):
                     st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: {st.session_state['last_cost']}")
-                
-                order_id_to_complete = st.text_input("Introduce el ID de la Orden para completar")
-                if st.button("Completar Orden") and st.session_state.get("last_path"):
-                    # Verificamos si la ruta fue calculada y si el ID de la orden está presente
-                    if order_id_to_complete:
-                        order_obj = orders_map.get(order_id_to_complete)
-                        if order_obj and order_obj.status != "delivered":
-                            route_cost = st.session_state['last_cost']  # Usamos el costo de la ruta calculada
-                            order_obj.complete(route_cost)
-                            st.success(f"¡La orden {order_id_to_complete} ha sido marcada como entregada!")
 
-                        else:
-                            st.warning("La orden ya está entregada o no se encontró.")
-                st.markdown("---")
-                st.markdown("### 🧭 Node Types:")
-                st.markdown(f"- 📦 **Storage Nodes**: {len(storage_nodes)}")
-                st.markdown(f"- 🔋 **Recharge Nodes**: {len(recharge_nodes)}")
-                st.markdown(f"- 👤 **Client Nodes**: {len(client_nodes)}")
 
-                
 # 3. Clients & Orders
     with tabs[2]:
         st.header("🌐 Clients and Orders")
@@ -318,6 +322,7 @@ def main():
             st.subheader("Clients (from hash map)")
             st.json(clientes_data)
 
+            clientes = st.session_state["last_simulation"]["clientes"]
             orders = st.session_state["last_simulation"]["orders"]
             orders_data = [o.to_dict() for o in orders]
             st.subheader("Orders (from list)")
