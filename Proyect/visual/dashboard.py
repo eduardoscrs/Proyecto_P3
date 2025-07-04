@@ -197,24 +197,30 @@ def main():
                 for n, (lat, lon) in node_coords.items():
                     tipo = nx_graph.nodes[n].get("tipo", "")
                     color = {"almacenamiento": "orange", "recarga": "blue", "cliente": "green"}.get(tipo, "gray")
-                    icon = None
+                    
+
                     if tipo == "almacenamiento":
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">📦</div>')
                     elif tipo == "recarga":
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">🔋</div>')
                     elif tipo == "cliente":
                         icon = folium.DivIcon(html=f'<div style="font-size:24px;">👤</div>')
+
                     popup_text = f"{n} ({tipo})"
+
                     connected = []
-                    
+
                     for u, v, d in nx_graph.edges(data=True):
                         if u == n or v == n:
                             other = v if u == n else u
                             connected.append(f"{other}: {d.get('weight','')}")
+
                     if connected:
                         popup_text += '<br>Peso(s):<br>' + '<br>'.join(connected)
+
+                    tooltip_text = f"{n} ({tipo})"
                     if icon:
-                        folium.Marker([lat, lon], icon=icon, popup=popup_text).add_to(m)
+                         folium.Marker([lat, lon], icon=icon, popup=popup_text, tooltip=tooltip_text).add_to(m)
                     else:
                         folium.CircleMarker([lat, lon], radius=7, color=color, fill=True, fill_opacity=0.8, popup=popup_text).add_to(m)
 
@@ -233,6 +239,7 @@ def main():
                             color="red", weight=5, opacity=0.9
                         ).add_to(m)
 
+                # Mostrar el MST si se presionó el botón
                 if st.session_state.get("show_mst", False):
                     from Proyect.model.graph_utils import kruskal_mst
                     mst_edges = kruskal_mst(graph)
