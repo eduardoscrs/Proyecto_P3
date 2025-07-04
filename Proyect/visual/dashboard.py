@@ -187,7 +187,7 @@ def main():
             node_options_client = client_nodes
 
             
-            random.seed(40)
+            random.seed(100)
             node_coords = {n: (random.uniform(-12.06, -12.03), random.uniform(-77.04, -77.01)) for n in nx_graph.nodes}
 
             col1, col2 = st.columns([0.65, 0.35])
@@ -247,7 +247,7 @@ def main():
                     for u, v in mst_edges:
                         folium.PolyLine(
                             [node_coords[u], node_coords[v]],
-                            color="#00ff00", weight=4, opacity=0.7, dash_array='10,10'
+                            color="#1100ff", weight=4, opacity=0.7, dash_array='10,10'
                         ).add_to(m)
                     
                 st_folium(m, width=750, height=520)
