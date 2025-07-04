@@ -1,14 +1,9 @@
-# run_dashboard.py
-import subprocess
-import os
 import sys
+import os
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))  # Agrega la raíz
 
-# Ruta absoluta al directorio raíz del proyecto (donde está Proyect/)
-project_root = os.path.abspath(os.path.dirname(__file__))
+import streamlit as st
+from Proyect.visual.dashboard import main
 
-# Establece la variable de entorno PYTHONPATH
-env = os.environ.copy()
-env["PYTHONPATH"] = project_root
-
-print("🖥️ Iniciando el dashboard de Streamlit...")
-subprocess.run(["streamlit", "run", "Proyect/visual/dashboard.py"], env=env)
+if __name__ == "__main__":
+    main()
