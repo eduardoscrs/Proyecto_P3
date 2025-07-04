@@ -12,6 +12,7 @@ from Proyect.visual.avl_visualizer import draw_avl_tree
 from Proyect.tda.avl import AVLTree
 from Proyect.model.graph_utils import dijkstra, reconstruct_path
 from streamlit_folium import st_folium
+from Proyect.domain.order import Order
 from Proyect.visual.report_generator import generate_pdf_report
 
 def start_simulation(num_nodes, num_edges, num_orders):
@@ -261,14 +262,7 @@ def main():
                 show_mst = st.button("🌲 Show MST (Kruskal)")
                 hide_mst = st.button("❌ Ocultar MST (Kruskal)")
 
-                if show_mst:
-                    st.session_state["show_mst"] = True
-                if hide_mst:
-                    st.session_state["show_mst"] = False
-                if st.session_state.get("last_path"):
-                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: `{st.session_state['last_cost']}`")
 
-                
                 if calcular:
                     if origen not in storage_nodes or destino not in client_nodes:
                         st.error("Only routes from Storage to Client are allowed.")
@@ -289,7 +283,24 @@ def main():
 
                 if show_mst:
                     st.session_state["show_mst"] = True
+                if hide_mst:
+                    st.session_state["show_mst"] = False
 
+                if st.session_state.get("last_path"):
+                    st.info(f"🛫 **Flight Summary**: Route `{' → '.join(st.session_state['last_path'])}` | Distance: {st.session_state['last_cost']}")
+                
+                order_id_to_complete = st.text_input("Introduce el ID de la Orden para completar")
+                if st.button("Completar Orden") and st.session_state.get("last_path"):
+                    # Verificamos si la ruta fue calculada y si el ID de la orden está presente
+                    if order_id_to_complete:
+                        order_obj = orders_map.get(order_id_to_complete)
+                        if order_obj and order_obj.status != "delivered":
+                            route_cost = st.session_state['last_cost']  # Usamos el costo de la ruta calculada
+                            order_obj.complete(route_cost)
+                            st.success(f"¡La orden {order_id_to_complete} ha sido marcada como entregada!")
+
+                        else:
+                            st.warning("La orden ya está entregada o no se encontró.")
                 st.markdown("---")
                 st.markdown("### 🧭 Node Types:")
                 st.markdown(f"- 📦 **Storage Nodes**: {len(storage_nodes)}")
